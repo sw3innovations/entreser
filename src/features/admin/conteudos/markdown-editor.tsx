@@ -14,6 +14,8 @@ interface MarkdownEditorProps {
   label?: string
   /** Quando true, marca o campo como "(opcional)" em vez de obrigatório (*). */
   optional?: boolean
+  /** Sem rótulo e com moldura de card (radius 22 + sombra suave) — o editor É o card. */
+  bare?: boolean
 }
 
 /**
@@ -21,7 +23,7 @@ interface MarkdownEditorProps {
  * escrever/dividir/preview e contador. O preview é gerado por um conversor
  * leve markdown→HTML (conteúdo é autorado por admin/profissional confiável).
  */
-export function MarkdownEditor({ value, onChange, error, label = 'Corpo do artigo', optional = false }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, error, label = 'Corpo do artigo', optional = false, bare = false }: MarkdownEditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [tab, setTab] = useState<Tab>('escrever')
 
@@ -89,16 +91,25 @@ export function MarkdownEditor({ value, onChange, error, label = 'Corpo do artig
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-plum/70">
-        {label}{' '}
-        {optional ? (
-          <span className="font-normal text-plum/40">(opcional)</span>
-        ) : (
-          <span className="text-red-alert">*</span>
+      {!bare && (
+        <span className="text-sm font-medium text-plum/70">
+          {label}{' '}
+          {optional ? (
+            <span className="font-normal text-plum/40">(opcional)</span>
+          ) : (
+            <span className="text-red-alert">*</span>
+          )}
+        </span>
+      )}
+      <div
+        className={cn(
+          'overflow-hidden bg-white',
+          bare
+            ? 'rounded-card border border-plum/5 shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
+            : cn('rounded-2xl border', error ? 'border-red-alert' : 'border-cream-dark'),
         )}
-      </span>
-      <div className={cn('overflow-hidden rounded-2xl border bg-white', error ? 'border-red-alert' : 'border-cream-dark')}>
-        {/* Toolbar */}
+      >
+        {/* Toolbar de formatação */}
         <div className="flex flex-wrap items-center gap-0.5 border-b border-plum/8 bg-cream px-2 py-1.5">
           <ToolBtn label="Título 1" onClick={() => linePrefix('# ')} icon={TB.h1} />
           <ToolBtn label="Título 2" onClick={() => linePrefix('## ')} icon={TB.h2} />
@@ -116,11 +127,12 @@ export function MarkdownEditor({ value, onChange, error, label = 'Corpo do artig
           <ToolBtn label="Link" onClick={() => wrap('[', '](https://)', 'texto')} icon={TB.link} />
           <ToolBtn label="Imagem" onClick={() => insert('![descrição](https://)')} icon={TB.image} />
           <ToolBtn label="Divisória" onClick={() => insert('---\n')} icon={TB.hr} />
-          <div className="ml-auto flex gap-0.5 rounded-[10px] bg-plum/5 p-[3px]">
-            <TabBtn label="Escrever" active={tab === 'escrever'} onClick={() => setTab('escrever')} />
-            <TabBtn label="Dividir" active={tab === 'dividir'} onClick={() => setTab('dividir')} />
-            <TabBtn label="Pré-visualizar" active={tab === 'preview'} onClick={() => setTab('preview')} />
-          </div>
+        </div>
+        {/* Abas — segunda linha, alinhadas à esquerda (como no protótipo) */}
+        <div className="flex gap-0.5 border-b border-plum/8 bg-cream px-2 py-1.5">
+          <TabBtn label="Escrever" active={tab === 'escrever'} onClick={() => setTab('escrever')} />
+          <TabBtn label="Dividir" active={tab === 'dividir'} onClick={() => setTab('dividir')} />
+          <TabBtn label="Pré-visualizar" active={tab === 'preview'} onClick={() => setTab('preview')} />
         </div>
 
         {/* Corpo */}

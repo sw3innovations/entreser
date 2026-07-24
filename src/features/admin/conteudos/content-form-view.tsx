@@ -2,19 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
-  BackButton,
+  ChevronRightIcon,
   ESButton,
   ESCard,
   ESSpinner,
+  ImageIcon,
   PageHeader,
-  TextInput,
-  TextareaInput,
   UploadIcon,
   useToast,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { ThumbUrlField } from '@/features/admin/components/thumb-url-field'
 import { useTagOptions } from '@/features/admin/tags/use-tags'
 import { estimarLeitura } from './duracao'
 import { MarkdownEditor } from './markdown-editor'
@@ -25,6 +24,12 @@ import type { Conteudo, Formato } from './types'
 
 /** Teto de duração em minutos (10h) — acima disso é quase sempre erro de digitação. */
 const MAX_DURACAO = 600
+
+// Estilos do redesenho (protótipo Claude Design): card branco radius-22 com sombra
+// suave; input branco radius-14, borda plum/14 e foco malva.
+const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
+const INPUT =
+  'w-full rounded-input border border-plum/[0.14] bg-white text-plum outline-none transition-colors placeholder:text-plum/40 focus:border-mauve'
 
 /** Tipos de mídia que um conteúdo pode ter (o formato "artigo" é o caso só-texto). */
 type MidiaTipo = Exclude<Formato, 'artigo'>
@@ -127,6 +132,10 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
   // sobrescrevemos silenciosamente um valor que já foi ao ar. Um conteúdo novo
   // (ou sem duração) começa em modo automático, derivando do corpo.
   const [duracaoManual, setDuracaoManual] = useState<boolean>(() => Boolean(existing?.duracao))
+  // Status exibido no seletor da coluna de publicação e na pílula do topo. Os
+  // botões Salvar rascunho / Publicar são a ação real; este estado só reflete a
+  // intenção visível (sincronizado ao salvar).
+  const [statusPublicado, setStatusPublicado] = useState<boolean>(existing?.publicado ?? false)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }))
@@ -207,6 +216,7 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
 
   const salvar = async (publicar: boolean) => {
     if (!validar(publicar)) return
+    setStatusPublicado(publicar)
     setSaving(true)
     const data = {
       formato,
@@ -230,78 +240,198 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
 
   return (
     <div>
-      <BackButton href="/admin/conteudos" label="Voltar para conteúdos" />
-      <PageHeader
-        breadcrumb={[
-          { label: 'Conteúdos', href: '/admin/conteudos' },
-          { label: editing ? 'Editar' : 'Novo' },
-        ]}
-        title={editing ? 'Editar conteúdo' : 'Novo conteúdo'}
-        description={
-          editing
-            ? 'Atualize os dados, o texto e a mídia deste conteúdo.'
-            : 'Escreva um texto, anexe uma mídia — ou os dois. Pelo menos um é obrigatório para publicar.'
-        }
-      />
+      {/* Barra de ações sticky — breadcrumb + status + Descartar/Salvar/Publicar */}
+      <div className="sticky top-16 z-10 -mx-10 mb-6 border-b border-plum/8 bg-canvas/85 px-10 py-3.5 backdrop-blur-[16px]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav aria-label="Trilha" className="flex items-center gap-2 text-[15px]">
+            <Link href="/admin/conteudos" className="text-plum/50 transition-colors hover:text-plum">
+              Conteúdo
+            </Link>
+            <ChevronRightIcon size={15} className="text-plum/30" />
+            <span className="font-medium text-plum">{editing ? 'Editar conteúdo' : 'Novo conteúdo'}</span>
+          </nav>
+          <div className="flex items-center gap-2.5">
+            <StatusPill publicado={statusPublicado} />
+            <button
+              type="button"
+              onClick={back}
+              disabled={saving}
+              className="rounded-pill px-4 py-[11px] text-sm font-semibold text-mauve transition-colors hover:text-mauve-dark disabled:opacity-50"
+            >
+              Descartar
+            </button>
+            <button
+              type="button"
+              onClick={() => salvar(false)}
+              disabled={saving}
+              className="rounded-pill border border-plum/[0.18] bg-white px-5 py-[11px] text-sm font-semibold text-plum transition-colors hover:border-plum/30 disabled:opacity-50"
+            >
+              Salvar rascunho
+            </button>
+            <button
+              type="button"
+              onClick={() => salvar(true)}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-pill bg-mauve px-[22px] py-[11px] text-sm font-semibold text-white shadow-[0_8px_20px_rgba(122,74,92,0.28)] transition-colors hover:bg-mauve-dark disabled:opacity-60"
+            >
+              <PlaneIcon /> Publicar
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex flex-col gap-5">
-        {/* Metadados */}
-        <ESCard variant="solid" isHoverable={false}>
-          <div className="flex flex-col gap-[18px] p-[26px]">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-[1.7fr_1fr] md:items-start">
-              <div className="flex flex-col gap-[18px]">
-                <TextInput
-                  label="Título"
-                  placeholder="Ex.: Como lidar com a ansiedade"
+      {/* Cabeçalho */}
+      <div className="mb-6">
+        <h1 className="font-display text-4xl font-light text-plum">
+          {editing ? 'Editar conteúdo' : 'Novo conteúdo'}
+        </h1>
+        <p className="mt-1.5 text-[15px] text-plum/60">
+          Escreva um texto, anexe uma mídia — ou os dois. Pelo menos um é obrigatório para publicar.
+        </p>
+      </div>
+
+      {errors.geral && (
+        <p className="mb-6 rounded-input border border-red-alert/30 bg-red-alert/[0.06] px-4 py-3 text-[13.5px] font-medium text-red-alert">
+          {errors.geral}
+        </p>
+      )}
+
+      {/* Duas colunas: principal (título/mídia/texto) + coluna de publicação/tags */}
+      <div className="flex flex-col gap-7 lg:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
+          {/* Título + Descrição */}
+          <section className={CARD}>
+            <div className="flex flex-col gap-[18px]">
+              <div>
+                <FieldLabel required>Título</FieldLabel>
+                <input
                   value={form.titulo}
-                  onChange={(v) => { set('titulo', v); setErrors((e) => ({ ...e, titulo: undefined })) }}
-                  errorMessage={errors.titulo}
-                  isRequired
+                  onChange={(e) => { set('titulo', e.target.value); setErrors((er) => ({ ...er, titulo: undefined })) }}
+                  placeholder="Ex.: Como lidar com a ansiedade"
+                  maxLength={200}
+                  className={cn(INPUT, 'px-[17px] py-[15px] font-display text-[22px] placeholder:text-plum/30')}
                 />
-                <TextareaInput
-                  label="Descrição"
-                  placeholder="Descrição curta usada em listagens e na busca…"
-                  value={form.descricao}
-                  onChange={(v) => set('descricao', v)}
-                  minRows={2}
-                />
+                {errors.titulo && <p className="mt-1.5 text-xs text-red-alert">{errors.titulo}</p>}
               </div>
-              <div className="flex flex-col gap-[18px]">
-                <div className="flex flex-col gap-1.5">
-                  <TextInput
-                    label="Duração estimada"
-                    placeholder="Ex.: 8"
-                    value={form.duracao}
-                    onChange={onDuracaoChange}
-                    errorMessage={errors.duracao}
-                    inputMode="numeric"
-                    maxLength={3}
-                    endContent="min"
-                  />
-                  {mostrarSugestao && (
-                    <button
-                      type="button"
-                      onClick={aplicarSugestao}
-                      className="self-start text-xs font-medium text-mauve hover:text-mauve-dark"
-                    >
-                      Sugerir do texto (~{sugestaoLeitura} min)
-                    </button>
-                  )}
-                </div>
-                <ThumbUrlField value={form.thumb} onChange={(v) => set('thumb', v)} />
+              <div>
+                <FieldLabel>Descrição</FieldLabel>
+                <textarea
+                  value={form.descricao}
+                  onChange={(e) => set('descricao', e.target.value)}
+                  placeholder="Descrição curta usada em listagens e na busca…"
+                  rows={3}
+                  className={cn(INPUT, 'resize-y px-4 py-[13px] text-[15px] leading-relaxed')}
+                />
               </div>
             </div>
-          </div>
-        </ESCard>
+          </section>
 
-        {/* Tags */}
-        <ESCard variant="solid" isHoverable={false}>
-          <div className="p-[22px]">
-            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-mauve">Tags</div>
-            {tags.length === 0 ? (
-              <div className="text-[13px] text-plum/50">
-                Nenhuma tag cadastrada. Crie tags em Conteúdo › Tags.
+          {/* Mídia — sempre disponível, opcional. O tipo escolhido deriva o formato. */}
+          <section className={CARD}>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-base text-plum">
+                Mídia <span className="text-plum/40">(opcional)</span>
+              </span>
+              <div className="flex gap-2">
+                {MIDIA_TIPOS.map((k) => {
+                  const on = midiaTipo === k
+                  const Icon = FORMATO[k].Icon
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => onMidiaTipoChange(k)}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-xl border px-[17px] py-2.5 text-[13.5px] font-medium transition-colors',
+                        on
+                          ? 'border-mauve bg-mauve text-white shadow-[0_6px_16px_rgba(122,74,92,0.26)]'
+                          : 'border-plum/[0.14] bg-white text-plum hover:border-plum/25',
+                      )}
+                    >
+                      <Icon size={16} /> {FORMATO[k].label}
+                    </button>
+                  )
+                })}
               </div>
+            </div>
+            <MediaUpload formato={midiaTipo} value={form.media} onChange={onMediaChange} />
+            <p className="mt-3 text-xs leading-relaxed text-plum/45">
+              {form.media
+                ? `Será exibido como ${FORMATO[midiaTipo].label} — a mídia aparece primeiro e o texto vem abaixo.`
+                : 'Sem mídia, o conteúdo é exibido como artigo (só texto).'}
+            </p>
+          </section>
+
+          {/* Texto (markdown) — o editor É o card (bare) */}
+          <MarkdownEditor
+            bare
+            value={form.corpo}
+            onChange={(v) => { set('corpo', v); setErrors((e) => ({ ...e, geral: undefined })) }}
+          />
+        </div>
+
+        {/* Coluna lateral: publicação + tags */}
+        <aside className="flex w-full flex-col gap-6 lg:w-[360px] lg:shrink-0">
+          {/* Publicação */}
+          <section className={CARD}>
+            <SectionLabel>Publicação</SectionLabel>
+            <div className="mt-4 flex flex-col gap-[18px]">
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <div className="relative">
+                  <select
+                    value={statusPublicado ? 'publicado' : 'rascunho'}
+                    onChange={(e) => setStatusPublicado(e.target.value === 'publicado')}
+                    className={cn(INPUT, 'appearance-none px-[15px] py-[13px] pr-10 text-[15px]')}
+                  >
+                    <option value="rascunho">Rascunho</option>
+                    <option value="publicado">Publicado</option>
+                  </select>
+                  <ChevronDownIcon className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-plum/40" />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Duração estimada</FieldLabel>
+                <div className="relative">
+                  <input
+                    value={form.duracao}
+                    onChange={(e) => onDuracaoChange(e.target.value)}
+                    inputMode="numeric"
+                    maxLength={3}
+                    placeholder="Ex.: 8"
+                    className={cn(INPUT, 'px-[15px] py-[13px] pr-12 text-[15px]')}
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-plum/45">
+                    min
+                  </span>
+                </div>
+                {errors.duracao && <p className="mt-1.5 text-xs text-red-alert">{errors.duracao}</p>}
+                {mostrarSugestao && (
+                  <button
+                    type="button"
+                    onClick={aplicarSugestao}
+                    className="mt-1.5 text-xs font-medium text-mauve hover:text-mauve-dark"
+                  >
+                    Sugerir do texto (~{sugestaoLeitura} min)
+                  </button>
+                )}
+              </div>
+              <CapaField value={form.thumb} onChange={(v) => set('thumb', v)} />
+            </div>
+          </section>
+
+          {/* Tags */}
+          <section className={CARD}>
+            <div className="mb-3.5 flex items-center justify-between gap-3">
+              <SectionLabel>Tags</SectionLabel>
+              {form.tags.length > 0 && (
+                <span className="text-xs text-plum/40">
+                  {form.tags.length} selecionada{form.tags.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+            {tags.length === 0 ? (
+              <p className="text-[13px] text-plum/50">Nenhuma tag cadastrada. Crie tags em Conteúdo › Tags.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => {
@@ -312,86 +442,21 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
                       type="button"
                       onClick={() => toggleTag(t.id)}
                       className={cn(
-                        'rounded-pill px-3.5 py-1.5 text-[13px] font-medium transition-colors',
-                        on ? 'border border-transparent bg-mauve text-white' : 'border border-plum/10 bg-mauve-ghost text-plum',
+                        'rounded-pill border px-4 py-[9px] text-[13.5px] font-medium transition-colors',
+                        on ? 'border-mauve bg-mauve text-white' : 'border-plum/[0.16] bg-white text-plum hover:border-plum/30',
                       )}
                     >
-                      {on ? '✓ ' : ''}
                       {t.nome}
                     </button>
                   )
                 })}
               </div>
             )}
-            <p className="mt-3 text-xs leading-relaxed text-plum/45">
+            <p className="mt-3.5 text-xs leading-relaxed text-plum/45">
               Sem tags, o conteúdo não aparece em nenhum feed personalizado nem na navegação por tag.
             </p>
-          </div>
-        </ESCard>
-
-        {/* Texto — sempre disponível, opcional (markdown). */}
-        <MarkdownEditor
-          label="Texto"
-          optional
-          value={form.corpo}
-          onChange={(v) => { set('corpo', v); setErrors((e) => ({ ...e, geral: undefined })) }}
-        />
-
-        {/* Mídia — sempre disponível, opcional. O tipo escolhido deriva o formato. */}
-        <ESCard variant="solid" isHoverable={false}>
-          <div className="flex flex-col gap-4 p-[26px]">
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-plum/70">
-                Mídia <span className="font-normal text-plum/40">(opcional)</span>
-              </span>
-              <div className="flex max-w-[460px] gap-2">
-                {MIDIA_TIPOS.map((k) => {
-                  const on = midiaTipo === k
-                  const Icon = FORMATO[k].Icon
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => onMidiaTipoChange(k)}
-                      className={cn(
-                        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-2.5 py-3 text-sm font-medium transition-colors',
-                        on ? 'border border-transparent bg-mauve text-white' : 'border border-plum/15 text-plum/60',
-                      )}
-                    >
-                      <Icon size={17} /> {FORMATO[k].label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <MediaUpload formato={midiaTipo} value={form.media} onChange={onMediaChange} />
-            <p className="text-xs leading-relaxed text-plum/45">
-              {form.media
-                ? `Será exibido como ${FORMATO[midiaTipo].label} — a mídia aparece primeiro e o texto vem abaixo.`
-                : 'Sem mídia, o conteúdo é exibido como artigo (só texto).'}
-            </p>
-          </div>
-        </ESCard>
-
-        {/* Regra ≥1 (ES-F1): publicar exige texto ou mídia. */}
-        {errors.geral && (
-          <p className="rounded-[14px] border border-red-alert/30 bg-red-alert/[0.06] px-4 py-3 text-[13.5px] font-medium text-red-alert">
-            {errors.geral}
-          </p>
-        )}
-      </div>
-
-      {/* Barra de ações */}
-      <div className="mt-[22px] flex flex-wrap justify-end gap-2.5 border-t border-plum/8 pt-5">
-        <ESButton variant="ghost" onPress={back} isDisabled={saving}>
-          Cancelar
-        </ESButton>
-        <ESButton variant="secondary" isLoading={saving} onPress={() => salvar(false)}>
-          Salvar rascunho
-        </ESButton>
-        <ESButton variant="primary" isLoading={saving} onPress={() => salvar(true)}>
-          {editing && existing?.publicado ? 'Salvar e publicar' : 'Publicar'}
-        </ESButton>
+          </section>
+        </aside>
       </div>
     </div>
   )
@@ -423,26 +488,25 @@ function MediaUpload({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-plum/70">Arquivo de {label}</span>
+    <div>
       <input ref={ref} type="file" accept={accept} onChange={onFile} className="hidden" />
       {value ? (
-        <div className="flex items-center gap-3 rounded-[14px] border border-success-dark/30 bg-success-dark/[0.06] px-4 py-3.5">
-          <span className="inline-flex text-success-dark">
+        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-success-dark/40 bg-success-dark/[0.06] px-[18px] py-3.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-success-dark">
             <UploadIcon size={18} />
           </span>
-          <span className="flex-1 truncate text-[13.5px] text-plum">{value}</span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-plum">{value}</span>
           <button
             type="button"
             onClick={() => ref.current?.click()}
-            className="text-[13px] font-medium text-mauve hover:text-mauve-dark"
+            className="shrink-0 text-[13px] font-medium text-mauve hover:text-mauve-dark"
           >
             Substituir
           </button>
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-[13px] font-medium text-plum/45 hover:text-red-alert"
+            className="shrink-0 text-[13px] font-medium text-plum/45 hover:text-red-alert"
           >
             Remover
           </button>
@@ -451,13 +515,99 @@ function MediaUpload({
         <button
           type="button"
           onClick={() => ref.current?.click()}
-          className="flex flex-col items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-cream-dark bg-cream px-4 py-7 text-plum/50"
+          className="flex w-full items-center gap-3.5 rounded-2xl border-2 border-dashed border-plum/[0.18] bg-cream-mid/[0.28] px-[18px] py-3.5 text-left transition-colors hover:border-mauve/40"
         >
-          <UploadIcon size={26} />
-          <span className="text-[13.5px] font-medium">Enviar arquivo de {label}</span>
-          <span className="text-xs">Até 500 MB</span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-mauve">
+            <UploadIcon size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13.5px] font-semibold text-plum">Enviar arquivo de {label}</span>
+            <span className="block text-xs text-plum/45">Até 500 MB</span>
+          </span>
+          <span className="shrink-0 text-[13px] font-medium text-mauve">Procurar</span>
         </button>
       )}
     </div>
+  )
+}
+
+/* ── Blocos do redesenho ── */
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="mb-2 block text-sm font-semibold text-plum">
+      {children}
+      {required && <span className="text-red-alert"> *</span>}
+    </label>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-[11px] font-semibold uppercase tracking-[0.13em] text-plum/45">{children}</span>
+}
+
+/** Pílula de status no topo — Rascunho (malva) ou Publicado (verde). */
+function StatusPill({ publicado }: { publicado: boolean }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-[13px] font-medium',
+        publicado ? 'bg-success-dark/[0.12] text-success-dark' : 'bg-mauve-mid/[0.14] text-mauve-mid',
+      )}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', publicado ? 'bg-success-dark' : 'bg-mauve-mid')} />
+      {publicado ? 'Publicado' : 'Rascunho'}
+    </span>
+  )
+}
+
+/** Capa por URL (upload real pendente — ES-010), no estilo do redesenho. */
+function CapaField({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const url = value ?? ''
+  const temPreview = /^https?:\/\//i.test(url)
+  return (
+    <div>
+      <FieldLabel>
+        Capa <span className="font-normal text-plum/40">(opcional)</span>
+      </FieldLabel>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-plum/40">
+          <ImageIcon size={16} />
+        </span>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => { const v = e.target.value.trim(); onChange(v ? v : null) }}
+          placeholder="https://…/imagem.jpg"
+          className={cn(INPUT, 'py-[13px] pl-[42px] pr-[15px] text-sm')}
+        />
+      </div>
+      {temPreview && (
+        <div
+          className="relative mt-2 aspect-video overflow-hidden rounded-input bg-cream bg-cover bg-center"
+          style={{ backgroundImage: `url("${url}")` }}
+        />
+      )}
+      <p className="mt-1.5 text-xs leading-relaxed text-plum/45">
+        O upload de capa ainda não está disponível. Cole a URL de uma imagem já hospedada (.jpg, .png ou .webp).
+      </p>
+    </div>
+  )
+}
+
+function PlaneIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   )
 }
