@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/context/auth-context'
 import { ToastProvider } from '@/components/ui'
 import { UsuariaShell } from '@/features/usuaria/shell/usuaria-shell'
 import { OnboardingGate } from '@/features/usuaria/shell/onboarding-gate'
+import { NavHistoryProvider } from '@/features/usuaria/shell/nav-history'
 
 /**
  * Guard + casca das rotas autenticadas da Usuária (M05).
@@ -39,9 +40,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <OnboardingGate>
-        <UsuariaShell>{children}</UsuariaShell>
-      </OnboardingGate>
+      <NavHistoryProvider>
+        <OnboardingGate>
+          <UsuariaShell>{children}</UsuariaShell>
+        </OnboardingGate>
+      </NavHistoryProvider>
     </ToastProvider>
   )
 }

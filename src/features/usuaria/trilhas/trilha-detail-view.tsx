@@ -7,6 +7,7 @@ import { ESButton, EmptyState, CheckIcon } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { PageHero, PageContent, HeroIconButton, HeroProgress, ArrowLeftIcon, ChevronRightIcon } from '../ui'
 import { conteudoHref, FORMATO_LABEL } from '../lib/content'
+import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { useTrilha } from './use-trilhas'
 import type { TrilhaItem } from './types'
 
@@ -20,8 +21,12 @@ export function TrilhaDetailView({ id }: { id: string }) {
   const router = useRouter()
   const { trilha, loading, error, notFound, reload } = useTrilha(id)
 
+  // Volta para a origem (feed, home, busca…) quando há histórico in-app; senão
+  // cai na lista de trilhas. Antes era um `href="/trilhas"` — um push pra frente
+  // que nunca devolvia a usuária para onde ela veio. Ver `useVoltar`.
+  const voltar = useVoltar('/trilhas')
   const backBar = (
-    <HeroIconButton aria-label="Voltar" href="/trilhas">
+    <HeroIconButton aria-label="Voltar" onPress={voltar}>
       <ArrowLeftIcon />
     </HeroIconButton>
   )

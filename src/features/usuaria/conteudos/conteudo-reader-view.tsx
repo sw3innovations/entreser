@@ -7,6 +7,7 @@ import { ESButton, EmptyState, CheckIcon } from '@/components/ui'
 import { mdToHtml } from '@/lib/markdown'
 import { PageHero, PageContent, HeroIconButton, GlassCard, AudioPlayer, ReadingRow, ArrowLeftIcon } from '@/features/usuaria/ui'
 import { FORMATO_LABEL, formatDuracao } from '@/features/usuaria/lib/content'
+import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { useConteudo } from './use-conteudo'
 import { useRecentes } from './use-recentes'
 import { conteudoResumoToVM } from './vm'
@@ -54,10 +55,9 @@ export function ConteudoReaderView({ id }: { id: string }) {
   const router = useRouter()
   const { conteudo, loading, error, notFound, salvando, toggleConcluido, reload } = useConteudo(id)
 
-  const voltar = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) router.back()
-    else router.push('/feed')
-  }
+  // Volta para a página de origem (feed, home, trilha, busca…) quando há
+  // histórico in-app; senão cai no feed. Ver `useVoltar`/`NavHistoryProvider`.
+  const voltar = useVoltar('/feed')
 
   const backBar = (
     <HeroIconButton aria-label="Voltar" onPress={voltar}>
