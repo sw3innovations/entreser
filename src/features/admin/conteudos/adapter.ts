@@ -52,11 +52,13 @@ const FORMATO_TO_API: Record<Formato, FormatoConteudoApi> = {
   artigo: 'Artigo',
   video: 'Video',
   audio: 'Audio',
+  imagem: 'Imagem',
 }
 const FORMATO_FROM_API: Record<FormatoConteudoApi, Formato> = {
   Artigo: 'artigo',
   Video: 'video',
   Audio: 'audio',
+  Imagem: 'imagem',
 }
 
 export function formatoToApi(f: Formato): FormatoConteudoApi {

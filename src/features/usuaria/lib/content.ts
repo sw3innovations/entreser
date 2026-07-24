@@ -5,6 +5,7 @@ export const FORMATO_LABEL: Record<Formato, string> = {
   artigo: 'Artigo',
   video: 'Vídeo',
   audio: 'Áudio',
+  imagem: 'Imagem',
 }
 
 /**

@@ -19,7 +19,7 @@ export type StatusUsuarioApi =
 export type UserTypeApi = 'PACIENTE' | 'PROFISSIONAL' | 'ADMINGERAL'
 
 /** Formato de conteúdo — o backend mantém PascalCase (NÃO é UPPER_SNAKE). */
-export type FormatoConteudoApi = 'Artigo' | 'Video' | 'Audio'
+export type FormatoConteudoApi = 'Artigo' | 'Video' | 'Audio' | 'Imagem'
 
 /** Origem da fase da paciente (FasePaciente). */
 export type OrigemFaseApi = 'Onboarding' | 'EscolhaManual'

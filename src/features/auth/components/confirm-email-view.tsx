@@ -78,12 +78,23 @@ function ConfirmarPorToken({ token }: { token: string }) {
 }
 
 function AvisoConfirmacao({ email, devToken }: { email?: string; devToken?: string }) {
-  // Reenvio de confirmação: o backend ainda NÃO expõe endpoint de reenvio
-  // (ver docs-backend/backend-detalhes-faltantes). Enquanto isso, não exibimos um
-  // botão de "Reenviar link" — ele não disparava e-mail nenhum e ainda mostrava um
-  // "enviamos um novo link" falso. Religar aqui quando `authService.reenviarConfirmacao`
-  // passar a chamar o endpoint real.
   const tokenAtual = devToken ?? null
+  const [enviando, setEnviando] = useState(false)
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  async function reenviar() {
+    if (!email || enviando) return
+    setEnviando(true)
+    setFeedback(null)
+    try {
+      await authService.reenviarConfirmacao(email)
+      setFeedback({ ok: true, msg: 'Enviamos um novo link de confirmação. Confira seu e-mail e a caixa de spam.' })
+    } catch (e) {
+      setFeedback({ ok: false, msg: mensagemDoErro(e) })
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   return (
     <div className="space-y-5 text-center">
@@ -115,10 +126,25 @@ function AvisoConfirmacao({ email, devToken }: { email?: string; devToken?: stri
         />
       )}
 
+      {/* Reenvio real do link (F3) — `POST /auth/reenviar-confirmacao`, idempotente
+          e com rate limit. Cobre também quem cai aqui do login (conta não confirmada). */}
       {email && !tokenAtual && (
-        <p className="text-xs leading-relaxed text-cream/40">
-          Não recebeu o e-mail? Confira sua caixa de spam.
-        </p>
+        <div className="space-y-3">
+          {feedback && <FormMessage tone={feedback.ok ? 'success' : 'error'}>{feedback.msg}</FormMessage>}
+          {!feedback?.ok && (
+            <p className="text-xs leading-relaxed text-cream/40">
+              Não recebeu? Confira o spam ou reenvie o link.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={reenviar}
+            disabled={enviando}
+            className="text-sm font-medium text-cream underline-offset-4 transition-colors hover:underline disabled:cursor-default disabled:opacity-60"
+          >
+            {enviando ? 'Enviando…' : 'Reenviar e-mail de confirmação'}
+          </button>
+        </div>
       )}
 
       <Link

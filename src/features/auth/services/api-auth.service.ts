@@ -120,9 +120,21 @@ export class ApiAuthService implements AuthService {
   }
 
   async reenviarConfirmacao(email: string): Promise<SignUpResult> {
-    // TODO(backend): sem endpoint de reenvio documentado (guia §2 / pendência).
-    // Resposta neutra para não quebrar o fluxo; trocar por chamada real quando existir.
-    return { email: norm(email) }
+    // `POST /auth/reenviar-confirmacao` (backend commit 26abf8ee) — idempotente
+    // (200 mesmo se o e-mail não existir, sem revelar cadastro) e com rate limit
+    // (429 → RATE_LIMITED). Não devolve corpo útil; só reprovamos em erro real.
+    const e = norm(email)
+    try {
+      await request('/auth/reenviar-confirmacao', {
+        method: 'POST',
+        auth: false,
+        responseType: 'text',
+        body: { email: e },
+      })
+    } catch (erro) {
+      throw toAuthError(erro, 'cadastro')
+    }
+    return { email: e }
   }
 
   // ── F4: login ───────────────────────────────────────────────────

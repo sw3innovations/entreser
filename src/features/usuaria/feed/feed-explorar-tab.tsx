@@ -7,7 +7,7 @@ import { conteudoHref, formatDuracao, type ContentItemVM } from '../lib/content'
 import { useExplorar } from '../conteudos/use-explorar'
 import type { ConteudoResumo, Formato } from '../conteudos/types'
 
-const TIPO_LABEL: Record<Formato, string> = { artigo: 'Artigos', video: 'Vídeos', audio: 'Áudios' }
+const TIPO_LABEL: Record<Formato, string> = { artigo: 'Artigos', video: 'Vídeos', audio: 'Áudios', imagem: 'Imagens' }
 
 function resumoToVM(c: ConteudoResumo): ContentItemVM {
   return {

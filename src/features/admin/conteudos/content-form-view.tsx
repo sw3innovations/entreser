@@ -18,7 +18,7 @@ import { ThumbUrlField } from '@/features/admin/components/thumb-url-field'
 import { useTagOptions } from '@/features/admin/tags/use-tags'
 import { estimarLeitura } from './duracao'
 import { MarkdownEditor } from './markdown-editor'
-import { FORMATO, FORMATO_OPTIONS } from './meta'
+import { FORMATO } from './meta'
 import { conteudosService } from '.'
 import { useConteudoMutations } from './use-conteudos'
 import type { Conteudo, Formato } from './types'
@@ -26,8 +26,14 @@ import type { Conteudo, Formato } from './types'
 /** Teto de duração em minutos (10h) — acima disso é quase sempre erro de digitação. */
 const MAX_DURACAO = 600
 
+/** Tipos de mídia que um conteúdo pode ter (o formato "artigo" é o caso só-texto). */
+type MidiaTipo = Exclude<Formato, 'artigo'>
+const MIDIA_TIPOS: MidiaTipo[] = ['video', 'audio', 'imagem']
+
+// ES-F1: o formato deixou de ser um interruptor que esconde campos. O form tem
+// SEMPRE um texto (markdown, opcional) e uma mídia (opcional); `formato` é
+// derivado — a mídia manda, e sem mídia o conteúdo é um artigo (só texto).
 interface FormState {
-  formato: Formato
   titulo: string
   descricao: string
   duracao: string
@@ -40,8 +46,7 @@ interface FormState {
 interface FormErrors {
   titulo?: string
   duracao?: string
-  corpo?: string
-  media?: string
+  geral?: string
 }
 
 export function ContentFormView({ id }: { id?: string }) {
@@ -101,7 +106,6 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
   const [form, setForm] = useState<FormState>(() =>
     existing
       ? {
-          formato: existing.formato,
           titulo: existing.titulo,
           descricao: existing.descricao,
           duracao: existing.duracao ? String(existing.duracao) : '',
@@ -110,7 +114,12 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
           thumb: existing.thumb,
           tags: [...existing.tags],
         }
-      : { formato: 'artigo', titulo: '', descricao: '', duracao: '', corpo: '', media: null, thumb: null, tags: [] },
+      : { titulo: '', descricao: '', duracao: '', corpo: '', media: null, thumb: null, tags: [] },
+  )
+  // Slot de mídia selecionado (vídeo/áudio/imagem). Só vira o `formato` efetivo
+  // quando há um arquivo anexado — senão o conteúdo é um artigo (só texto).
+  const [midiaTipo, setMidiaTipo] = useState<MidiaTipo>(() =>
+    existing && existing.formato !== 'artigo' ? existing.formato : 'video',
   )
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
@@ -129,6 +138,10 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
 
   const back = () => router.push('/admin/conteudos')
 
+  // Formato derivado: a mídia manda; sem mídia, é artigo (só texto). É o que
+  // classifica o conteúdo no feed e o que a leitura usa para decidir o layout.
+  const formato: Formato = form.media ? midiaTipo : 'artigo'
+
   // Sanitiza a duração digitada (só dígitos, no máx. 3) e marca o campo como
   // manual — a partir daí a sugestão automática para de sobrescrever.
   const onDuracaoChange = (v: string) => {
@@ -137,30 +150,35 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
     setErrors((e) => ({ ...e, duracao: undefined }))
   }
 
-  // ES-006: enquanto o campo não for tocado à mão, artigos sugerem o tempo de
-  // leitura a partir do corpo. Debounce para não recalcular a cada tecla e não
-  // travar a digitação. Vídeo/áudio ficam sempre manuais (a duração é a da mídia).
+  // ES-006: enquanto o campo não for tocado à mão, artigos (só-texto) sugerem o
+  // tempo de leitura a partir do corpo. Debounce para não recalcular a cada tecla
+  // e não travar a digitação. Com mídia anexada a duração é a do arquivo (manual).
   useEffect(() => {
-    if (form.formato !== 'artigo' || duracaoManual) return
+    if (formato !== 'artigo' || duracaoManual) return
     const corpo = form.corpo
     const t = setTimeout(() => {
       setForm((f) => ({ ...f, duracao: corpo.trim() ? String(estimarLeitura(corpo)) : '' }))
     }, 400)
     return () => clearTimeout(t)
-  }, [form.corpo, form.formato, duracaoManual])
+  }, [form.corpo, formato, duracaoManual])
 
-  // ES-006: trocar de formato é uma ação do usuário, não um efeito reativo. Ao
-  // SAIR de artigo com a duração ainda em modo automático, limpa o valor herdado
-  // do corpo — senão a estimativa de leitura ficaria presa e seria salva como
-  // "duração da mídia" de um vídeo/áudio.
-  const onFormatoChange = (k: Formato) =>
-    setForm((f) =>
-      k !== 'artigo' && !duracaoManual && f.duracao ? { ...f, formato: k, duracao: '' } : { ...f, formato: k },
-    )
+  // ES-F1: anexar/remover a mídia deriva o formato. Ao SAIR de artigo com a
+  // duração ainda em modo automático, limpa o valor herdado do corpo — senão a
+  // estimativa de leitura ficaria presa e seria salva como "duração" de um vídeo.
+  const onMediaChange = (v: string | null) => {
+    setForm((f) => ({ ...f, media: v, duracao: v && !duracaoManual ? '' : f.duracao }))
+    setErrors((e) => ({ ...e, geral: undefined }))
+  }
+  // Trocar o tipo de mídia troca o filtro de arquivo aceito; um arquivo do tipo
+  // anterior não combina mais, então é descartado.
+  const onMidiaTipoChange = (k: MidiaTipo) => {
+    setMidiaTipo(k)
+    setForm((f) => ({ ...f, media: null }))
+  }
 
   // Sugestão explícita para voltar ao valor calculado depois de ter editado à mão.
   const sugestaoLeitura =
-    form.formato === 'artigo' && form.corpo.trim() ? estimarLeitura(form.corpo) : 0
+    formato === 'artigo' && form.corpo.trim() ? estimarLeitura(form.corpo) : 0
   const mostrarSugestao = sugestaoLeitura > 0 && duracaoManual && form.duracao !== String(sugestaoLeitura)
   const aplicarSugestao = () => {
     setDuracaoManual(false)
@@ -178,10 +196,10 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
       if (!Number.isFinite(n) || n <= 0) e.duracao = 'Informe uma duração em minutos.'
       else if (n > MAX_DURACAO) e.duracao = `Máximo de ${MAX_DURACAO} minutos (10h).`
     }
-    if (paraPublicar) {
-      if (form.formato === 'artigo' && !form.corpo.trim()) e.corpo = 'O corpo do artigo é obrigatório para publicar.'
-      if ((form.formato === 'video' || form.formato === 'audio') && !form.media)
-        e.media = 'Envie a mídia para publicar.'
+    // ES-F1 · regra ≥1: publicar exige ao menos um texto OU uma mídia. Rascunho
+    // pode ficar vazio (é trabalho em andamento).
+    if (paraPublicar && !form.corpo.trim() && !form.media) {
+      e.geral = 'Para publicar, adicione ao menos um texto ou uma mídia.'
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -191,11 +209,12 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
     if (!validar(publicar)) return
     setSaving(true)
     const data = {
-      formato: form.formato,
+      formato,
       titulo: form.titulo.trim(),
       descricao: form.descricao.trim(),
       duracao: form.duracao ? parseInt(form.duracao, 10) : null,
-      corpo: form.formato === 'artigo' ? form.corpo : '',
+      // ES-F1: texto e mídia coexistem — o corpo nunca é apagado por causa do formato.
+      corpo: form.corpo,
       media: form.media,
       thumb: form.thumb,
       tags: form.tags,
@@ -220,8 +239,8 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
         title={editing ? 'Editar conteúdo' : 'Novo conteúdo'}
         description={
           editing
-            ? 'Atualize os dados e a mídia deste conteúdo.'
-            : 'Cadastre um conteúdo e publique ou salve como rascunho.'
+            ? 'Atualize os dados, o texto e a mídia deste conteúdo.'
+            : 'Escreva um texto, anexe uma mídia — ou os dois. Pelo menos um é obrigatório para publicar.'
         }
       />
 
@@ -229,29 +248,6 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
         {/* Metadados */}
         <ESCard variant="solid" isHoverable={false}>
           <div className="flex flex-col gap-[18px] p-[26px]">
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-plum/70">Formato</span>
-              <div className="flex max-w-[460px] gap-2">
-                {FORMATO_OPTIONS.map((k) => {
-                  const on = form.formato === k
-                  const Icon = FORMATO[k].Icon
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => onFormatoChange(k)}
-                      className={cn(
-                        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-2.5 py-3 text-sm font-medium transition-colors',
-                        on ? 'border border-transparent bg-mauve text-white' : 'border border-plum/15 text-plum/60',
-                      )}
-                    >
-                      <Icon size={17} /> {FORMATO[k].label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 gap-5 md:grid-cols-[1.7fr_1fr] md:items-start">
               <div className="flex flex-col gap-[18px]">
                 <TextInput
@@ -333,24 +329,55 @@ function ContentForm({ existing }: { existing: Conteudo | null }) {
           </div>
         </ESCard>
 
-        {/* Corpo (artigo) ou mídia */}
-        {form.formato === 'artigo' ? (
-          <MarkdownEditor
-            value={form.corpo}
-            onChange={(v) => { set('corpo', v); setErrors((e) => ({ ...e, corpo: undefined })) }}
-            error={errors.corpo}
-          />
-        ) : (
-          <ESCard variant="solid" isHoverable={false}>
-            <div className="p-[26px]">
-              <MediaUpload
-                formato={form.formato}
-                value={form.media}
-                onChange={(v) => { set('media', v); setErrors((e) => ({ ...e, media: undefined })) }}
-                error={errors.media}
-              />
+        {/* Texto — sempre disponível, opcional (markdown). */}
+        <MarkdownEditor
+          label="Texto"
+          optional
+          value={form.corpo}
+          onChange={(v) => { set('corpo', v); setErrors((e) => ({ ...e, geral: undefined })) }}
+        />
+
+        {/* Mídia — sempre disponível, opcional. O tipo escolhido deriva o formato. */}
+        <ESCard variant="solid" isHoverable={false}>
+          <div className="flex flex-col gap-4 p-[26px]">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-plum/70">
+                Mídia <span className="font-normal text-plum/40">(opcional)</span>
+              </span>
+              <div className="flex max-w-[460px] gap-2">
+                {MIDIA_TIPOS.map((k) => {
+                  const on = midiaTipo === k
+                  const Icon = FORMATO[k].Icon
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => onMidiaTipoChange(k)}
+                      className={cn(
+                        'flex flex-1 items-center justify-center gap-2 rounded-[14px] px-2.5 py-3 text-sm font-medium transition-colors',
+                        on ? 'border border-transparent bg-mauve text-white' : 'border border-plum/15 text-plum/60',
+                      )}
+                    >
+                      <Icon size={17} /> {FORMATO[k].label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </ESCard>
+            <MediaUpload formato={midiaTipo} value={form.media} onChange={onMediaChange} />
+            <p className="text-xs leading-relaxed text-plum/45">
+              {form.media
+                ? `Será exibido como ${FORMATO[midiaTipo].label} — a mídia aparece primeiro e o texto vem abaixo.`
+                : 'Sem mídia, o conteúdo é exibido como artigo (só texto).'}
+            </p>
+          </div>
+        </ESCard>
+
+        {/* Regra ≥1 (ES-F1): publicar exige texto ou mídia. */}
+        {errors.geral && (
+          <p className="rounded-[14px] border border-red-alert/30 bg-red-alert/[0.06] px-4 py-3 text-[13.5px] font-medium text-red-alert">
+            {errors.geral}
+          </p>
         )}
       </div>
 
@@ -374,16 +401,15 @@ function MediaUpload({
   formato,
   value,
   onChange,
-  error,
 }: {
-  formato: Formato
+  formato: MidiaTipo
   value: string | null
   onChange: (v: string | null) => void
-  error?: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
   const { showToast } = useToast()
   const label = FORMATO[formato].label.toLowerCase()
+  const accept = formato === 'video' ? 'video/*' : formato === 'audio' ? 'audio/*' : 'image/*'
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -398,16 +424,8 @@ function MediaUpload({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-plum/70">
-        Arquivo de {label} <span className="text-red-alert">*</span>
-      </span>
-      <input
-        ref={ref}
-        type="file"
-        accept={formato === 'video' ? 'video/*' : 'audio/*'}
-        onChange={onFile}
-        className="hidden"
-      />
+      <span className="text-sm font-medium text-plum/70">Arquivo de {label}</span>
+      <input ref={ref} type="file" accept={accept} onChange={onFile} className="hidden" />
       {value ? (
         <div className="flex items-center gap-3 rounded-[14px] border border-success-dark/30 bg-success-dark/[0.06] px-4 py-3.5">
           <span className="inline-flex text-success-dark">
@@ -421,22 +439,25 @@ function MediaUpload({
           >
             Substituir
           </button>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-[13px] font-medium text-plum/45 hover:text-red-alert"
+          >
+            Remover
+          </button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => ref.current?.click()}
-          className={cn(
-            'flex flex-col items-center gap-2 rounded-[14px] border-[1.5px] border-dashed bg-cream px-4 py-7 text-plum/50',
-            error ? 'border-red-alert' : 'border-cream-dark',
-          )}
+          className="flex flex-col items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-cream-dark bg-cream px-4 py-7 text-plum/50"
         >
           <UploadIcon size={26} />
           <span className="text-[13.5px] font-medium">Enviar arquivo de {label}</span>
           <span className="text-xs">Até 500 MB</span>
         </button>
       )}
-      {error && <span className="text-xs text-red-alert">{error}</span>}
     </div>
   )
 }

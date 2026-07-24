@@ -14,6 +14,7 @@ const GRADIENT: Record<Formato, string> = {
   artigo: 'from-plum-soft to-mauve-ghost',
   video: 'from-mauve-ghost to-plum-soft',
   audio: 'from-cream-mid to-plum-soft',
+  imagem: 'from-mauve-soft to-cream-mid',
 }
 
 function TypeIcon({ formato, size = 36, className = 'text-plum/30' }: { formato: Formato; size?: number; className?: string }) {

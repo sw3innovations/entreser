@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ESButton, EmptyState, CheckIcon } from '@/components/ui'
 import { mdToHtml } from '@/lib/markdown'
-import { PageHero, PageContent, HeroIconButton, GlassCard, ReadingRow, ArrowLeftIcon } from '@/features/usuaria/ui'
+import { PageHero, PageContent, HeroIconButton, GlassCard, AudioPlayer, ReadingRow, ArrowLeftIcon } from '@/features/usuaria/ui'
 import { FORMATO_LABEL, formatDuracao } from '@/features/usuaria/lib/content'
 import { useConteudo } from './use-conteudo'
 import { useRecentes } from './use-recentes'
@@ -98,6 +98,15 @@ export function ConteudoReaderView({ id }: { id: string }) {
     ? `${FORMATO_LABEL[conteudo.formato]} · ${conteudo.tagNome}`
     : FORMATO_LABEL[conteudo.formato]
 
+  // ES-F2: mídia e texto podem coexistir. Renderizamos a mídia primeiro (§4 do
+  // spec) e o texto abaixo, exibindo só o que existir. `formato != artigo` indica
+  // conteúdo com mídia; sem URL (upload ainda mock) mostramos um placeholder.
+  const midiaUrl = conteudo.media?.trim() || null
+  const formatoMidia = conteudo.formato !== 'artigo'
+  const temMidia = formatoMidia && Boolean(midiaUrl)
+  const midiaPendente = formatoMidia && !midiaUrl
+  const temTexto = Boolean(conteudo.corpo?.trim())
+
   const topBar = (
     <div className="flex items-center justify-between">
       <HeroIconButton aria-label="Voltar" onPress={voltar}>
@@ -122,18 +131,54 @@ export function ConteudoReaderView({ id }: { id: string }) {
       </PageHero>
 
       <PageContent width="md" className="pt-6">
-        {conteudo.formato === 'artigo' ? (
-          // Sem card: o texto vai direto no fundo creme, ocupando a largura da coluna.
+        {/* Mídia primeiro (§4): vídeo / áudio / imagem — só quando há URL real */}
+        {temMidia && (
+          <div className={temTexto ? 'mb-8' : undefined}>
+            {conteudo.formato === 'video' ? (
+              <GlassCard>
+                <video
+                  controls
+                  playsInline
+                  poster={conteudo.thumb ?? undefined}
+                  src={midiaUrl ?? undefined}
+                  className="aspect-video w-full bg-black"
+                >
+                  Seu navegador não suporta vídeo.
+                </video>
+              </GlassCard>
+            ) : conteudo.formato === 'imagem' ? (
+              <GlassCard>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={midiaUrl ?? undefined} alt={conteudo.titulo} className="w-full" />
+              </GlassCard>
+            ) : (
+              <AudioPlayer src={midiaUrl} titulo={conteudo.titulo} duracao={duracao} />
+            )}
+          </div>
+        )}
+
+        {/* Mídia ainda não subiu (upload mock) — placeholder discreto, não quebra a tela */}
+        {midiaPendente && (
+          <div
+            className={cn(
+              'flex items-center justify-center rounded-card border border-dashed border-plum/15 bg-white/50 py-12 text-sm text-plum/45',
+              temTexto && 'mb-8',
+            )}
+          >
+            Mídia ainda indisponível.
+          </div>
+        )}
+
+        {/* Texto depois — direto no fundo, ocupando a coluna */}
+        {temTexto && (
           <article className={cn('font-body', PROSE)} dangerouslySetInnerHTML={{ __html: mdToHtml(conteudo.corpo) }} />
-        ) : conteudo.formato === 'video' ? (
-          <GlassCard>
-            <video controls playsInline poster={conteudo.thumb ?? undefined} src={conteudo.media ?? undefined} className="aspect-video w-full bg-black">
-              Seu navegador não suporta vídeo.
-            </video>
-            {conteudo.descricao && <p className="px-5 py-4 text-sm leading-relaxed text-plum/70">{conteudo.descricao}</p>}
-          </GlassCard>
-        ) : (
-          <AudioPlayer src={conteudo.media} titulo={conteudo.titulo} duracao={duracao} />
+        )}
+
+        {/* Sem mídia e sem texto (raro) */}
+        {!temMidia && !midiaPendente && !temTexto && (
+          <p className="text-sm leading-relaxed text-plum/50">
+            Este conteúdo ainda não tem mídia nem texto para exibir.
+          </p>
         )}
 
         <Relacionados excluirId={conteudo.id} />
@@ -184,22 +229,6 @@ function Relacionados({ excluirId }: { excluirId: string }) {
         ))}
       </div>
     </section>
-  )
-}
-
-function AudioPlayer({ src, titulo, duracao }: { src: string | null; titulo: string; duracao?: string }) {
-  return (
-    <div className="relative overflow-hidden rounded-card bg-gradient-to-br from-plum-soft to-mauve-ghost p-5 shadow-card">
-      <div className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
-      <div className="relative z-10">
-        <p className="text-eyebrow text-mauve">Áudio</p>
-        <p className="mt-1 font-display text-lg leading-snug text-plum">{titulo}</p>
-        {duracao && <p className="mt-0.5 text-xs text-plum/45">{duracao}</p>}
-        <audio controls src={src ?? undefined} className="mt-4 w-full">
-          Seu navegador não suporta áudio.
-        </audio>
-      </div>
-    </div>
   )
 }
 

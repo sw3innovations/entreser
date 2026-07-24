@@ -1,4 +1,4 @@
-export type Formato = 'artigo' | 'video' | 'audio'
+export type Formato = 'artigo' | 'video' | 'audio' | 'imagem'
 
 /** Conteúdo da biblioteca (M05): artigo (markdown), vídeo ou áudio. */
 export interface Conteudo {
