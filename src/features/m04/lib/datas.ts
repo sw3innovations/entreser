@@ -52,7 +52,12 @@ export function emDiasISO(dias: number): string {
   return `${d.getFullYear()}-${mes}-${dia}`
 }
 
-/** Valor em reais: `R$ 250,00`. */
-export function reais(valor: number): string {
+/**
+ * Valor em reais: `R$ 250,00`. Valores fora de uma faixa plausível (negativos ou absurdos,
+ * como o `-1.79e308` que um mock devolve por padrão em campos `double`) viram `null` — é
+ * melhor omitir o preço do que estampar um número sem sentido na tela.
+ */
+export function reais(valor: number): string | null {
+  if (!Number.isFinite(valor) || valor < 0 || valor > 1_000_000) return null
   return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

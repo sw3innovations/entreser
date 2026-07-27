@@ -70,7 +70,9 @@ export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profi
         eyebrow="Agendar"
         title="Escolha o horário"
         description={
-          dados ? `Sessão de ${dados.duracaoMinutos} minutos · ${reais(dados.valor)}` : 'Horários disponíveis'
+          dados
+            ? [`Sessão de ${dados.duracaoMinutos} minutos`, reais(dados.valor)].filter(Boolean).join(' · ')
+            : 'Horários disponíveis'
         }
       />
       <PageContent width="md" className="pt-6">

@@ -76,7 +76,9 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
                 <dl className="mt-4 flex flex-col gap-3">
                   <Linha rotulo="Horário" valor={faixaHoraria(dados.dataHora, dados.dataHoraFim)} />
                   <Linha rotulo="Duração" valor={`${dados.duracaoMinutos} minutos`} />
-                  <Linha rotulo="Valor" valor={reais(dados.valorPraticado)} />
+                  {reais(dados.valorPraticado) && (
+                    <Linha rotulo="Valor" valor={reais(dados.valorPraticado)!} />
+                  )}
                 </dl>
               </div>
 
