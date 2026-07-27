@@ -19,10 +19,16 @@ import type { NextConfig } from 'next'
  */
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'https://api.entreser.sw3.tec.br'
 
+// M04 (Agendamento) fala com um backend próprio. Hoje é o mock Prism em :4010 (D20 — o
+// backend ainda não existe); troque `M04_ORIGIN` para o staging quando existir. Proxy
+// same-origin `/m04-api/*` para evitar CORS, espelhando o `/api/*` acima.
+const M04_ORIGIN = process.env.M04_ORIGIN ?? 'http://localhost:4010'
+
 const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: '/api/:path*', destination: `${BACKEND_ORIGIN}/api/:path*` },
+      { source: '/m04-api/:path*', destination: `${M04_ORIGIN}/:path*` },
       {
         source: '/oauth2/authorization/:path*',
         destination: `${BACKEND_ORIGIN}/oauth2/authorization/:path*`,

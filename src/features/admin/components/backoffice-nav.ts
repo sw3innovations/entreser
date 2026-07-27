@@ -13,6 +13,9 @@ import {
   MetricasIcon,
   PerfilIcon,
   ManualIcon,
+  AgendaIcon,
+  RelogioIcon,
+  ValoresIcon,
 } from '@/components/ui'
 
 export type BackofficeProfile = 'admin' | 'prof'
@@ -65,6 +68,15 @@ export const NAV_ADMIN: NavGroup[] = [
 
 /** Navegação da Profissional — apenas a própria conta. */
 export const NAV_PROF: NavGroup[] = [
+  {
+    section: 'Atendimento',
+    items: [
+      { key: 'agenda', label: 'Minha agenda', href: '/admin/agenda', icon: AgendaIcon },
+      { key: 'horarios', label: 'Meus horários', href: '/admin/horarios', icon: RelogioIcon },
+      { key: 'bloqueios', label: 'Bloquear datas', href: '/admin/bloqueios', icon: OnboardingIcon },
+      { key: 'valores', label: 'Meus valores', href: '/admin/valores', icon: ValoresIcon },
+    ],
+  },
   {
     section: 'Conta',
     items: [{ key: 'perfil', label: 'Meu perfil', href: '/admin/perfil', icon: PerfilIcon }],

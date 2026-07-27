@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "gen:api": "openapi-typescript src/features/m04/contract/openapi.yaml -o src/features/m04/api/schema.ts",
+    "predev": "npm run gen:api",
+    "prebuild": "npm run gen:api",
+    "m04:check-erros": "node scripts/m04-check-erros.mjs"
   },
   "dependencies": {
     "@heroui/react": "^3.2.1",
@@ -14,6 +18,7 @@
     "@internationalized/date": "^3.12.2",
     "clsx": "^2.1.1",
     "next": "16.2.9",
+    "openapi-fetch": "^0.17.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.80.0",
@@ -21,12 +26,14 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
