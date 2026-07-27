@@ -24,5 +24,9 @@ export const USUARIA_NAV_MOBILE: BottomNavItem[] = [
   { key: 'conta', label: 'Conta', href: '/conta', icon: <PerfilIcon /> },
 ]
 
-/** Rotas full-screen que escondem a BottomNav (leitor e onboarding). */
-export const NAV_HIDDEN_PREFIXES = ['/onboarding', '/conteudos/']
+/**
+ * Rotas full-screen que escondem a BottomNav — leitor, onboarding e os fluxos do M04
+ * (agendamento e detalhe da sessão), que têm barra de ação fixa embaixo e colidiriam
+ * com a navegação.
+ */
+export const NAV_HIDDEN_PREFIXES = ['/onboarding', '/conteudos/', '/agendar', '/sessoes/']
