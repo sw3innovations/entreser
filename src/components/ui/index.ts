@@ -20,7 +20,13 @@ export { CheckboxInput, type CheckboxInputProps } from './checkbox-input'
 export { PasswordInput, type PasswordInputProps } from './password-input'
 export { PhoneInput, maskPhoneBR, type PhoneInputProps } from './phone-input'
 export { MoneyInput, formatCentavos, type MoneyInputProps } from './money-input'
-export { DateInput, TimeInput, type DateInputProps, type TimeInputProps } from './date-input'
+export {
+  DateInput,
+  TimeInput,
+  type DateInputProps,
+  type TimeInputProps,
+  type TemaCampo,
+} from './date-input'
 
 // Layout & estrutura
 export { Container, type ContainerProps } from './container'

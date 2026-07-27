@@ -1,21 +1,74 @@
 'use client'
 
 import { useRef } from 'react'
-import { Calendar, DateField, DatePicker, I18nProvider, TimeField } from '@heroui/react'
+import { Calendar, DateField, DatePicker, FieldError, I18nProvider, Label, TimeField } from '@heroui/react'
 import { parseDate, parseTime } from '@internationalized/date'
 import { cn } from '@/lib/utils'
 import { AgendaIcon, ChevronDownIcon, RelogioIcon } from './icons'
+
+/**
+ * Os dois climas do app: `claro` no backoffice e nas telas internas; `escuro` nas telas
+ * de auth (gradiente ameixa, campos glassmorphic). Um componente com duas peles evita
+ * manter dois DatePickers quase iguais em lugares diferentes.
+ */
+export type TemaCampo = 'claro' | 'escuro'
+
+interface Pele {
+  grupo: string
+  label: string
+  segmentos: string
+  segmento: string
+  prefixo: string
+  trigger: string
+  erro: string
+  popover: string
+  bordaNormal: string
+  bordaErro: string
+}
+
+const PELES: Record<TemaCampo, Pele> = {
+  claro: {
+    grupo:
+      'flex h-auto w-full items-center gap-2 rounded-[10px] border bg-white/60 px-3 py-2 shadow-none outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 focus-within:border-mauve focus-within:shadow-[0_0_0_1px_var(--color-mauve)]',
+    label: 'text-sm font-medium text-plum/70',
+    segmentos: 'flex flex-1 gap-px px-0 py-0 font-body text-sm text-plum',
+    segmento: 'rounded px-0.5 text-plum data-[placeholder=true]:text-plum/30',
+    prefixo: 'mx-0 shrink-0 text-plum/40',
+    trigger: 'w-auto p-0 text-plum/40 transition-colors hover:text-mauve',
+    erro: 'mt-0 px-0 text-xs text-red-alert',
+    // O popover é renderizado em portal no <body>, fora da árvore da tela: sem esta
+    // classe herdaria o tema escuro definido no :root (ver globals.css §1b).
+    popover: 'heroui-claro w-auto min-w-0 border border-plum/8',
+    bordaNormal: 'border-cream-dark',
+    bordaErro: 'border-red-alert',
+  },
+  escuro: {
+    grupo:
+      'flex h-auto w-full cursor-pointer items-center gap-3 rounded-2xl border bg-white/10 px-4 py-3.5 shadow-none outline-none backdrop-blur-sm transition-all focus-within:bg-white/15 focus-within:ring-0',
+    label: 'mb-2 block w-fit text-[11px] font-medium uppercase tracking-wider text-cream/40',
+    segmentos: 'flex flex-1 gap-px px-0 py-0 text-sm text-cream',
+    segmento: 'rounded-md px-0.5 text-cream data-[placeholder=true]:text-cream/30',
+    prefixo: 'mx-0 shrink-0 text-cream/30',
+    trigger: 'w-auto p-0 text-cream/40 transition-colors hover:text-cream/70',
+    erro: 'mt-1.5 px-0 text-xs font-medium text-mauve-soft',
+    popover: 'w-auto min-w-0 border border-white/10 text-cream',
+    bordaNormal: 'border-white/10 focus-within:border-cream/30',
+    bordaErro: 'border-mauve-soft/60',
+  },
+}
 
 interface CampoTemporalProps {
   label?: string
   /** `YYYY-MM-DD` no DateInput, `HH:mm` no TimeInput — o formato que a API usa. */
   value?: string
   onChange?: (value: string) => void
+  onBlur?: () => void
   errorMessage?: string
   isRequired?: boolean
   isDisabled?: boolean
   /** Texto auxiliar abaixo do campo. */
   hint?: string
+  tema?: TemaCampo
   name?: string
   className?: string
 }
@@ -25,6 +78,11 @@ export interface DateInputProps extends CampoTemporalProps {
   min?: string
   /** Data máxima selecionável (`YYYY-MM-DD`). */
   max?: string
+  /**
+   * Mês em que o calendário abre quando o campo está vazio (`YYYY-MM-DD`). Útil para
+   * datas distantes do mês atual — numa data de nascimento, abrir em 2026 é inútil.
+   */
+  abrirEm?: string
 }
 
 export type TimeInputProps = CampoTemporalProps
@@ -49,52 +107,35 @@ function isoParaHora(hhmm?: string) {
   }
 }
 
-/** Moldura dos campos — a mesma do `TextInput`, para o formulário ter um vocabulário só. */
-const GRUPO =
-  'flex h-auto w-full items-center gap-2 rounded-[10px] border bg-white/60 px-3 py-2 shadow-none outline-none backdrop-blur-sm transition-[border-color,box-shadow] duration-200 focus-within:border-mauve focus-within:shadow-[0_0_0_1px_var(--color-mauve)]'
-const SEGMENTOS = 'flex flex-1 gap-px px-0 py-0 font-body text-sm text-plum'
-const SEGMENTO = 'rounded px-0.5 text-plum data-[placeholder=true]:text-plum/30'
-
-function Rotulo({ label, isRequired }: { label?: string; isRequired?: boolean }) {
-  if (!label) return null
-  return (
-    <span className="text-sm font-medium text-plum/70">
-      {label}
-      {isRequired && <span className="text-red-alert"> *</span>}
-    </span>
-  )
-}
-
-function Auxiliar({ errorMessage, hint }: { errorMessage?: string; hint?: string }) {
-  if (errorMessage) return <span className="text-xs text-red-alert">{errorMessage}</span>
-  if (hint) return <span className="text-xs text-plum/45">{hint}</span>
-  return null
+function Auxiliar({ hint, pele }: { hint?: string; pele: Pele }) {
+  if (!hint) return null
+  return <span className={cn('text-xs', pele === PELES.escuro ? 'text-cream/40' : 'text-plum/45')}>{hint}</span>
 }
 
 /**
- * DateInput — data com o DatePicker do HeroUI (o mesmo componente da data de nascimento),
- * vestido com a moldura do kit: label, ícone, borda e foco iguais aos demais campos.
+ * DateInput — data com o DatePicker do HeroUI: campo digitável por segmentos
+ * (dd/mm/aaaa, com avanço automático) e calendário ao clique em qualquer ponto.
  *
- * O campo é digitável por segmentos (dd/mm/aaaa) e abre o calendário ao clique em
- * qualquer ponto — não só na setinha. `value`/`onChange` falam `YYYY-MM-DD`, o formato
- * da API, sem conversão na tela.
- *
- * O popover leva `.heroui-claro`: ele é renderizado em portal no `<body>`, fora da árvore
- * da tela, e sem essa classe herdaria o tema escuro das telas de auth.
+ * `value`/`onChange` falam `YYYY-MM-DD`, o formato da API — a tela não converte nada.
+ * A pele vem de `tema`: `claro` (padrão, backoffice) ou `escuro` (telas de auth).
  */
 export function DateInput({
   label,
   value,
   onChange,
+  onBlur,
   errorMessage,
   isRequired,
   isDisabled,
   hint,
+  tema = 'claro',
   name,
   className,
   min,
   max,
+  abrirEm,
 }: DateInputProps) {
+  const pele = PELES[tema]
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   // Clicar em qualquer lugar do campo abre o calendário, exceto nos segmentos
@@ -116,37 +157,40 @@ export function DateInput({
         onChange={(date) => onChange?.(date ? date.toString() : '')}
         minValue={isoParaData(min) ?? undefined}
         maxValue={isoParaData(max) ?? undefined}
+        placeholderValue={isoParaData(abrirEm) ?? undefined}
         isInvalid={Boolean(errorMessage)}
         isDisabled={isDisabled}
         shouldForceLeadingZeros
-        className={cn('flex flex-col gap-1.5', className)}
+        className={cn('flex w-full flex-col gap-1.5', className)}
       >
-        <Rotulo label={label} isRequired={isRequired} />
+        {label && (
+          <Label className={pele.label}>
+            {label}
+            {isRequired && <span className="text-red-alert"> *</span>}
+          </Label>
+        )}
 
         <DateField.Group
           fullWidth
+          onBlur={onBlur}
           onClick={abrirAoClicar}
           className={cn(
-            GRUPO,
+            pele.grupo,
             'cursor-pointer',
-            errorMessage ? 'border-red-alert' : 'border-cream-dark',
+            errorMessage ? pele.bordaErro : pele.bordaNormal,
             isDisabled && 'opacity-50',
           )}
         >
-          <DateField.Prefix className="mx-0 shrink-0 text-plum/40">
+          <DateField.Prefix className={pele.prefixo}>
             <AgendaIcon size={16} />
           </DateField.Prefix>
 
-          <DateField.Input className={SEGMENTOS}>
-            {(segment) => <DateField.Segment segment={segment} className={SEGMENTO} />}
+          <DateField.Input className={pele.segmentos}>
+            {(segment) => <DateField.Segment segment={segment} className={pele.segmento} />}
           </DateField.Input>
 
           <DateField.Suffix className="mx-0 shrink-0">
-            <DatePicker.Trigger
-              ref={triggerRef}
-              aria-label="Abrir calendário"
-              className="w-auto p-0 text-plum/40 transition-colors hover:text-mauve"
-            >
+            <DatePicker.Trigger ref={triggerRef} aria-label="Abrir calendário" className={pele.trigger}>
               <DatePicker.TriggerIndicator className="size-4 text-current">
                 <ChevronDownIcon size={16} />
               </DatePicker.TriggerIndicator>
@@ -154,12 +198,13 @@ export function DateInput({
           </DateField.Suffix>
         </DateField.Group>
 
-        <Auxiliar errorMessage={errorMessage} hint={hint} />
+        {errorMessage ? (
+          <FieldError className={pele.erro}>{errorMessage}</FieldError>
+        ) : (
+          <Auxiliar hint={hint} pele={pele} />
+        )}
 
-        <DatePicker.Popover
-          placement="bottom start"
-          className="heroui-claro w-auto min-w-0 border border-plum/8"
-        >
+        <DatePicker.Popover placement="bottom start" className={pele.popover}>
           <Calendar aria-label={label} className="w-64">
             <Calendar.Header>
               <Calendar.YearPickerTrigger>
@@ -191,19 +236,23 @@ export function DateInput({
 
 /**
  * TimeInput — irmão do DateInput para horário (`HH:mm`), com o TimeField do HeroUI.
- * Sem popover: a digitação por segmentos (hh:mm) é o caminho natural de um horário.
+ * Sem popover: digitar hh:mm é o caminho natural de um horário.
  */
 export function TimeInput({
   label,
   value,
   onChange,
+  onBlur,
   errorMessage,
   isRequired,
   isDisabled,
   hint,
+  tema = 'claro',
   name,
   className,
 }: TimeInputProps) {
+  const pele = PELES[tema]
+
   return (
     <I18nProvider locale="pt-BR">
       <TimeField
@@ -215,23 +264,33 @@ export function TimeInput({
         isDisabled={isDisabled}
         shouldForceLeadingZeros
         hourCycle={24}
-        className={cn('flex flex-col gap-1.5', className)}
+        className={cn('flex w-full flex-col gap-1.5', className)}
       >
-        <Rotulo label={label} isRequired={isRequired} />
+        {label && (
+          <Label className={pele.label}>
+            {label}
+            {isRequired && <span className="text-red-alert"> *</span>}
+          </Label>
+        )}
 
         <TimeField.Group
           fullWidth
-          className={cn(GRUPO, errorMessage ? 'border-red-alert' : 'border-cream-dark', isDisabled && 'opacity-50')}
+          onBlur={onBlur}
+          className={cn(pele.grupo, errorMessage ? pele.bordaErro : pele.bordaNormal, isDisabled && 'opacity-50')}
         >
-          <TimeField.Prefix className="mx-0 shrink-0 text-plum/40">
+          <TimeField.Prefix className={pele.prefixo}>
             <RelogioIcon size={16} />
           </TimeField.Prefix>
-          <TimeField.Input className={SEGMENTOS}>
-            {(segment) => <TimeField.Segment segment={segment} className={SEGMENTO} />}
+          <TimeField.Input className={pele.segmentos}>
+            {(segment) => <TimeField.Segment segment={segment} className={pele.segmento} />}
           </TimeField.Input>
         </TimeField.Group>
 
-        <Auxiliar errorMessage={errorMessage} hint={hint} />
+        {errorMessage ? (
+          <FieldError className={pele.erro}>{errorMessage}</FieldError>
+        ) : (
+          <Auxiliar hint={hint} pele={pele} />
+        )}
       </TimeField>
     </I18nProvider>
   )
