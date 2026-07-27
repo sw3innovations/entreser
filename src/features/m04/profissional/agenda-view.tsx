@@ -94,6 +94,14 @@ export function AgendaView() {
       <PageHeader
         title="Minha agenda"
         description="Suas sessões dos últimos 14 dias e dos próximos 30."
+        action={
+          <Link
+            href="/admin/agenda/novo-grupo"
+            className="inline-flex h-[42px] items-center rounded-full bg-mauve px-5 text-[14px] font-semibold text-cream shadow-[0_8px_20px_rgba(122,74,92,0.28)] transition-es hover:bg-mauve-dark"
+          >
+            Criar sessão de grupo
+          </Link>
+        }
       />
 
       {/* Pendências — contagens dos totais do envelope, nunca de content.length. */}
