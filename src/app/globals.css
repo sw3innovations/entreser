@@ -97,12 +97,17 @@
 
 
 /* ─────────────────────────────────────────────────────────────────
-   1b. TEMA HEROUI — usado só pelo DatePicker (data de nascimento).
-       Reescreve as variáveis semânticas do HeroUI para um calendário
-       escuro on-brand; todo o resto (hover/foco/soft) deriva via
-       color-mix no tema compartilhado do HeroUI. Fica em :root (fora
-       de @layer, logo vence as variáveis em layer base do HeroUI) para
-       também alcançar o popover, que é renderizado em portal no <body>.
+   1b. TEMA HEROUI — DatePicker/TimeField.
+       Reescreve as variáveis semânticas do HeroUI; todo o resto
+       (hover/foco/soft) deriva via color-mix no tema compartilhado.
+       Fica em :root (fora de @layer, logo vence as variáveis em layer
+       base do HeroUI) para também alcançar o popover, renderizado em
+       portal no <body>.
+
+       O DEFAULT é escuro porque nasceu nas telas de auth. O backoffice
+       é claro, então o popover de lá recebe `.heroui-claro` — a classe
+       viaja no próprio elemento do portal, que é o único jeito de
+       tematizar por contexto quando o popover não fica na árvore da tela.
    ──────────────────────────────────────────────────────────────── */
 
 :root {
@@ -116,6 +121,20 @@
   --default-foreground: #F5EDE0;
   --border:             rgb(45 24 64 / 0.12);    /* borda neutra (também ok nas telas claras) */
   --overlay-shadow:     0 24px 64px rgb(20 8 30 / 0.55);
+}
+
+/* Calendário claro do backoffice — mesma paleta, invertida. */
+.heroui-claro {
+  --overlay:            #FFFFFF;                 /* superfície do popover                 */
+  --overlay-foreground: #2D1840;                 /* plum                                  */
+  --foreground:         #2D1840;                 /* plum — texto do calendário            */
+  --accent:             #7A4A5C;                 /* mauve — dia selecionado/hoje/nav      */
+  --accent-foreground:  #FFFDFA;                 /* quase branco — texto sobre o accent   */
+  --muted:              rgb(45 24 64 / 0.45);    /* plum/45 — dias da semana, fora do mês */
+  --default:            rgb(122 74 92 / 0.10);   /* mauve/10 — hover de célula            */
+  --default-foreground: #2D1840;
+  --border:             rgb(45 24 64 / 0.10);
+  --overlay-shadow:     0 24px 60px rgb(45 24 64 / 0.18);
 }
 
 
