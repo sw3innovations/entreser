@@ -92,11 +92,16 @@ export interface AdminGeral {
 }
 
 /** Projeção segura do admin exposta ao cliente. */
+/**
+ * Quem está logado no backoffice. São dois perfis com a mesma porta e a mesma casca:
+ * `AdminGeral` (equipe Entre Ser) e `Profissional` (painel de atendimento). É o `perfil`
+ * que decide o menu e o acesso às telas da equipe.
+ */
 export interface AdminDTO {
   id: string
   nome: string
   email: string
-  perfil: 'AdminGeral'
+  perfil: Extract<Perfil, 'AdminGeral' | 'Profissional'>
 }
 
 /** Sessão autenticada do backoffice (separada da sessão da Usuária). */

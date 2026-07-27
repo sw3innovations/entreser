@@ -52,9 +52,31 @@ export function perfilFromRoles(roles: readonly string[]): Perfil {
   return 'Usuaria'
 }
 
-/** Atalho para a decisão de rota do backoffice. */
+/**
+ * Quem pode ENTRAR no backoffice: Admin Geral e Profissional. As duas usam a mesma
+ * porta (`/admin/login`) e a mesma casca, mas veem menus diferentes — a profissional
+ * só o painel de atendimento (ver `NAV_PROF`).
+ */
+export function podeEntrarNoBackoffice(roles: readonly string[]): boolean {
+  return roles.includes('ADMINGERAL') || roles.includes('PROFISSIONAL')
+}
+
+/**
+ * É Admin Geral — a checagem para o que é EXCLUSIVO da equipe (usuárias, conteúdos,
+ * profissionais, métricas). Não confundir com `podeEntrarNoBackoffice`: uma profissional
+ * entra no backoffice sem ser admin.
+ */
 export function isAdmin(roles: readonly string[]): boolean {
   return roles.includes('ADMINGERAL')
+}
+
+/**
+ * Perfil de quem está no backoffice. Só faz sentido depois de `podeEntrarNoBackoffice`
+ * ter passado — por isso o retorno é estreito (nunca `Usuaria`): quem não é Admin Geral
+ * e chegou até aqui é Profissional.
+ */
+export function perfilBackoffice(roles: readonly string[]): 'AdminGeral' | 'Profissional' {
+  return isAdmin(roles) ? 'AdminGeral' : 'Profissional'
 }
 
 /** Fallback quando só houver `userType` (menos confiável que `roles[]`). */

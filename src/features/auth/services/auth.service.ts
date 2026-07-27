@@ -49,8 +49,9 @@ export interface AuthService {
   /**
    * Primeiro acesso da profissional: define a senha a partir do token do convite
    * recebido por e-mail. O token é de uso único e expira — daí o erro dedicado.
+   * O backend ativa a conta e devolve a sessão, então já entra no painel.
    */
-  profissionalPrimeiroAcesso(token: string, input: RedefinirSenhaInput): Promise<void>
+  profissionalPrimeiroAcesso(token: string, input: RedefinirSenhaInput): Promise<AdminSession>
 
   /** Retorna a sessão atual persistida, ou null. */
   getSession(): Promise<Session | null>

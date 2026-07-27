@@ -8,7 +8,7 @@ import {
   request,
   setAccessToken,
 } from '@/lib/http'
-import { isAdmin, perfilFromRoles, planoFromApi, statusFromApi } from '@/lib/api/enums'
+import { podeEntrarNoBackoffice, perfilBackoffice, perfilFromRoles, planoFromApi, statusFromApi } from '@/lib/api/enums'
 import type { LoginResponse } from '@/lib/api/types'
 import { AuthError } from '../lib/errors'
 import { apenasDigitos } from '../schemas/auth.schema'
@@ -78,7 +78,10 @@ export class ApiAuthService implements AuthService {
       id: login.id || this.claim('sub'),
       nome: login.nome,
       email: login.email || emailFallback || this.claim('email'),
-      perfil: 'AdminGeral',
+      // Deriva de `roles[]` — o backoffice recebe Admin Geral E Profissional, e é este
+      // campo que decide o menu e o acesso às telas da equipe. Cravar 'AdminGeral' daria
+      // à profissional a navegação de admin.
+      perfil: perfilBackoffice(login.roles),
     }
   }
 
@@ -213,17 +216,31 @@ export class ApiAuthService implements AuthService {
    * Primeiro acesso da profissional (`POST /auth/profissional/primeiro-acesso`). O corpo
    * usa `senha` (não `novaSenha`, como o redefinir) — é outro endpoint, com outro contrato.
    * Token inválido ou já usado volta 410, que `toAuthError` mapeia como token expirado.
+   *
+   * O backend ATIVA a conta e já devolve a sessão (mesmo corpo do login, mais o cookie de
+   * refresh). Aproveitamos: a profissional entra direto no painel, sem passar pelo login
+   * logo depois de criar a senha.
    */
-  async profissionalPrimeiroAcesso(token: string, input: RedefinirSenhaInput): Promise<void> {
+  async profissionalPrimeiroAcesso(
+    token: string,
+    input: RedefinirSenhaInput,
+  ): Promise<AdminSession> {
+    let login: LoginResponse
     try {
-      await request('/auth/profissional/primeiro-acesso', {
+      login = await request<LoginResponse>('/auth/profissional/primeiro-acesso', {
         method: 'POST',
         auth: false,
-        responseType: 'text',
+        retryOn401: false,
         body: { token, senha: input.senha },
       })
     } catch (erro) {
       throw toAuthError(erro, 'token')
+    }
+    setAccessToken(login.accessToken)
+    return {
+      user: this.buildAdminDTO(login),
+      accessToken: login.accessToken,
+      expiresAt: this.expiresAt(),
     }
   }
 
@@ -258,8 +275,9 @@ export class ApiAuthService implements AuthService {
     } catch (erro) {
       throw toAuthError(erro, 'login')
     }
-    if (!isAdmin(login.roles)) {
-      // Não é admin — não revela o motivo (mesma resposta de credencial inválida).
+    if (!podeEntrarNoBackoffice(login.roles)) {
+      // Nem admin nem profissional — não revela o motivo (mesma resposta de credencial
+      // inválida). Uma usuária comum entra pelo `/login`, não por aqui.
       clearAccessToken()
       throw new AuthError('CREDENCIAIS_INVALIDAS')
     }
@@ -318,7 +336,7 @@ export class ApiAuthService implements AuthService {
 
   async getAdminSession(): Promise<AdminSession | null> {
     const login = await refreshSession()
-    if (!login || !isAdmin(login.roles)) return null
+    if (!login || !podeEntrarNoBackoffice(login.roles)) return null
     return {
       user: this.buildAdminDTO(login),
       accessToken: getAccessToken() ?? '',

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { mensagemDoErro } from '../lib/errors'
@@ -21,6 +22,7 @@ import { IconLock } from './icons'
  * com uma senha provisória e a troca a partir da sessão, sem token.
  */
 export function FirstAccessForm({ token }: { token?: string }) {
+  const router = useRouter()
   const [concluido, setConcluido] = useState(false)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
 
@@ -40,8 +42,11 @@ export function FirstAccessForm({ token }: { token?: string }) {
       return
     }
     try {
+      // O backend ativa a conta e devolve a sessão — a profissional já entra, sem
+      // precisar digitar a senha de novo na tela de login.
       await authService.profissionalPrimeiroAcesso(token, values)
       setConcluido(true)
+      router.replace('/admin/agenda')
     } catch (e) {
       setErroGeral(mensagemDoErro(e))
     }
@@ -50,11 +55,9 @@ export function FirstAccessForm({ token }: { token?: string }) {
   if (concluido) {
     return (
       <div className="space-y-4">
-        <FormMessage tone="success">
-          Senha criada. Agora é só entrar no painel com o seu e-mail e a nova senha.
-        </FormMessage>
+        <FormMessage tone="success">Senha criada. Levando você para o painel…</FormMessage>
         <Link
-          href="/admin/login"
+          href="/admin/agenda"
           className="block text-center text-sm font-medium text-cream transition-colors hover:text-cream/80"
         >
           Ir para o painel

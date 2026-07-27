@@ -459,7 +459,7 @@ export class MockAuthService implements AuthService {
    * nasce no backoffice, que já roda contra o backend real), então aqui só existe o
    * caminho de token inexistente — o suficiente para a tela ser exercitada sem servidor.
    */
-  async profissionalPrimeiroAcesso(): Promise<void> {
+  async profissionalPrimeiroAcesso(): Promise<AdminSession> {
     await delay()
     throw new AuthError('TOKEN_NAO_ENCONTRADO')
   }
