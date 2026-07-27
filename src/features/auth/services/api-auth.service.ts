@@ -209,6 +209,24 @@ export class ApiAuthService implements AuthService {
     }
   }
 
+  /**
+   * Primeiro acesso da profissional (`POST /auth/profissional/primeiro-acesso`). O corpo
+   * usa `senha` (não `novaSenha`, como o redefinir) — é outro endpoint, com outro contrato.
+   * Token inválido ou já usado volta 410, que `toAuthError` mapeia como token expirado.
+   */
+  async profissionalPrimeiroAcesso(token: string, input: RedefinirSenhaInput): Promise<void> {
+    try {
+      await request('/auth/profissional/primeiro-acesso', {
+        method: 'POST',
+        auth: false,
+        responseType: 'text',
+        body: { token, senha: input.senha },
+      })
+    } catch (erro) {
+      throw toAuthError(erro, 'token')
+    }
+  }
+
   // ── sessão ──────────────────────────────────────────────────────
   async getSession(): Promise<Session | null> {
     const login = await refreshSession()

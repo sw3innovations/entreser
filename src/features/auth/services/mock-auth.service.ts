@@ -454,6 +454,16 @@ export class MockAuthService implements AuthService {
     }
   }
 
+  /**
+   * Primeiro acesso da profissional. O mock não semeia convites de profissional (o fluxo
+   * nasce no backoffice, que já roda contra o backend real), então aqui só existe o
+   * caminho de token inexistente — o suficiente para a tela ser exercitada sem servidor.
+   */
+  async profissionalPrimeiroAcesso(): Promise<void> {
+    await delay()
+    throw new AuthError('TOKEN_NAO_ENCONTRADO')
+  }
+
   // ── sessão ──────────────────────────────────────────────────────
   async getSession(): Promise<Session | null> {
     if (typeof window === 'undefined') return null

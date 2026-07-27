@@ -46,6 +46,12 @@ export interface AuthService {
   /** F7 — redefine a senha via token e invalida sessões anteriores. */
   redefinirSenha(token: string, input: RedefinirSenhaInput): Promise<void>
 
+  /**
+   * Primeiro acesso da profissional: define a senha a partir do token do convite
+   * recebido por e-mail. O token é de uso único e expira — daí o erro dedicado.
+   */
+  profissionalPrimeiroAcesso(token: string, input: RedefinirSenhaInput): Promise<void>
+
   /** Retorna a sessão atual persistida, ou null. */
   getSession(): Promise<Session | null>
 
