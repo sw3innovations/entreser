@@ -50,6 +50,22 @@ Erros padronizados (`lib/errors.ts`) seguem `{ codigo, mensagem, campo }` da spe
 Rotas: `(auth)` públicas, `(app)` autenticadas (guard no cliente hoje; no
 backend real vira proxy otimista + Data Access Layer no servidor).
 
+## Branches e ambientes
+
+| Branch | Papel |
+|---|---|
+| `main` | **Homologação** — é o que está publicado em `app.entreser.sw3.tec.br` e o que as clientes veem. Só recebe o que já vai ser apresentado. |
+| `develop` | Trabalho corrente: módulos novos e melhorias. É daqui que se ramifica. |
+| `feat/*` | Uma frente de trabalho; nasce de `develop` e volta pra lá. |
+
+Promover para homologação é **merge `develop` → `main`**, e acontece quando o módulo vai
+ser apresentado — não a cada commit. Correção urgente do que já está no ar pode ir direto
+na `main` (e depois voltar pro `develop`), como foi o fix do primeiro acesso.
+
+⚠️ **A config de deploy não está no repositório** (sem `.github/workflows`, sem
+`vercel.json`) — ela vive na hospedagem e observa a `main`. Renomear ou trocar essa branch
+quebra a publicação até alguém ajustar lá.
+
 ## Padrões de código
 
 - Server Components por padrão; `'use client'` só com hooks/eventos/estado.
