@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ESButton, PageHeader, useToast } from '@/components/ui'
-import { cn } from '@/lib/utils'
+import { ESButton, MoneyInput, PageHeader, formatCentavos, useToast } from '@/components/ui'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -12,25 +11,13 @@ import type { components } from '@/features/m04/api/schema'
 type TipoSessao = components['schemas']['TipoSessao']
 type TipoInfo = components['schemas']['TipoSessaoInfo']
 
-/** Estado local do formulário: o valor digitado por tipo, como texto. */
-type Rascunho = Record<string, string>
+/**
+ * Estado local do formulário: o valor por tipo, em REAIS. `null` = tipo não oferecido —
+ * é o mesmo vocabulário do contrato, então não há conversão de texto no meio.
+ */
+type Rascunho = Record<string, number | null>
 
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
-const INPUT =
-  'w-full rounded-input border border-plum/[0.14] bg-white py-[13px] pl-11 pr-[15px] text-[15px] text-plum outline-none transition-colors placeholder:text-plum/35 focus:border-mauve'
-
-/** "250" ou "250,50" → 250.5 · vazio → null (tipo não oferecido). */
-function paraNumero(texto: string): number | null {
-  const limpo = texto.trim().replace(/\./g, '').replace(',', '.')
-  if (!limpo) return null
-  const n = Number(limpo)
-  return Number.isFinite(n) ? n : null
-}
-
-function paraTexto(valor: number | null | undefined): string {
-  if (valor == null) return ''
-  return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 /**
  * P6 · Meus valores. Um campo por tipo do catálogo (`GET /tipos-sessao` — a lista e os
@@ -63,21 +50,17 @@ export function ValoresView() {
    * do servidor. Derivar evita semear estado num efeito (que dispara render em cascata) e
    * mantém uma fonte só da verdade enquanto o formulário está limpo.
    */
-  const valorDe = (tipo: TipoSessao): string =>
-    rascunho[tipo] ?? paraTexto(valores?.valores.find((v) => v.tipoSessao === tipo)?.valor)
+  const valorDe = (tipo: TipoSessao): number | null =>
+    tipo in rascunho ? rascunho[tipo] : (valores?.valores.find((v) => v.tipoSessao === tipo)?.valor ?? null)
 
-  const editar = (tipo: TipoSessao, texto: string) => {
-    setRascunho((r) => ({ ...r, [tipo]: texto.replace(/[^\d.,]/g, '') }))
+  const editar = (tipo: TipoSessao, valor: number | null) => {
+    setRascunho((r) => ({ ...r, [tipo]: valor }))
     setSujo(true)
     setErro(null)
   }
 
-  const invalidos = tipos.filter((t) => {
-    const texto = valorDe(t.codigo)
-    if (!texto.trim()) return false
-    const n = paraNumero(texto)
-    return n == null || n <= 0
-  })
+  // Vazio (null) é válido: significa "não ofereço". Zero é engano de digitação.
+  const invalidos = tipos.filter((t) => valorDe(t.codigo) === 0)
 
   const salvar = async () => {
     if (salvando || invalidos.length > 0) return
@@ -86,7 +69,7 @@ export function ValoresView() {
     try {
       // Substituição total: TODOS os tipos vão no corpo, os vazios como null.
       const body = {
-        valores: tipos.map((t) => ({ tipoSessao: t.codigo, valor: paraNumero(valorDe(t.codigo)) })),
+        valores: tipos.map((t) => ({ tipoSessao: t.codigo, valor: valorDe(t.codigo) })),
       }
       const { error } = await m04.PUT('/profissional/valores', { body })
       if (error) {
@@ -111,7 +94,7 @@ export function ValoresView() {
     setErro(null)
   }
 
-  const definidos = tipos.filter((t) => valorDe(t.codigo).trim()).length
+  const definidos = tipos.filter((t) => valorDe(t.codigo) != null).length
 
   return (
     <div>
@@ -124,10 +107,9 @@ export function ValoresView() {
         <div className="flex flex-col gap-6 lg:flex-row">
           <div className="flex min-w-0 flex-1 flex-col gap-4">
             {tipos.map((t) => {
-              const texto = valorDe(t.codigo)
+              const valor = valorDe(t.codigo)
               const ehGrupo = t.categoria === 'Grupo'
               const invalido = invalidos.some((i) => i.codigo === t.codigo)
-              const n = paraNumero(texto)
               return (
                 <section key={t.codigo} className={CARD}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -138,7 +120,7 @@ export function ValoresView() {
                         {ehGrupo && ` · ${t.minParticipantes} a ${t.maxParticipantes} participantes`}
                       </p>
                     </div>
-                    {!texto.trim() && (
+                    {valor == null && (
                       <span className="rounded-pill bg-plum/6 px-2.5 py-1 text-[11px] font-medium text-plum/50">
                         Não aparece para as usuárias
                       </span>
@@ -146,29 +128,17 @@ export function ValoresView() {
                   </div>
 
                   <div className="mt-3.5 max-w-[280px]">
-                    <label className="block">
-                      <span className="text-sm font-medium text-plum/70">
-                        {ehGrupo ? 'Valor por participante' : 'Valor da sessão'}
-                      </span>
-                      <div className="relative mt-1.5">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-plum/45">
-                          R$
-                        </span>
-                        <input
-                          value={texto}
-                          onChange={(e) => editar(t.codigo, e.target.value)}
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          className={cn(INPUT, invalido && 'border-red-alert')}
-                        />
-                      </div>
-                    </label>
-                    {invalido && <p className="mt-1.5 text-xs text-red-alert">Informe um valor maior que zero.</p>}
-                    {ehGrupo && n != null && n > 0 && (
-                      <p className="mt-1.5 text-xs text-plum/45">
-                        Até R$ {(n * t.maxParticipantes).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} com {t.maxParticipantes} inscritas.
-                      </p>
-                    )}
+                    <MoneyInput
+                      label={ehGrupo ? 'Valor por participante' : 'Valor da sessão'}
+                      value={valor}
+                      onChange={(v) => editar(t.codigo, v)}
+                      errorMessage={invalido ? 'Informe um valor maior que zero.' : undefined}
+                      hint={
+                        ehGrupo && valor != null && valor > 0
+                          ? `Até ${formatCentavos(Math.round(valor * t.maxParticipantes * 100))} com ${t.maxParticipantes} inscritas.`
+                          : undefined
+                      }
+                    />
                   </div>
                 </section>
               )

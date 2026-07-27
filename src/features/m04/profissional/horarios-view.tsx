@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ESButton, PageHeader, PlusIcon, TrashIcon, useToast } from '@/components/ui'
+import { ESButton, PageHeader, PlusIcon, TimeInput, TrashIcon, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
@@ -34,8 +34,6 @@ const DIAS: { codigo: DiaSemana; label: string }[] = [
 ]
 
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
-const TIME =
-  'rounded-input border border-plum/[0.14] bg-white px-3 py-2 text-[14.5px] text-plum outline-none transition-colors focus:border-mauve'
 
 /** Intervalo entre sessões — só leitura hoje; o backend é quem manda (D2). */
 const INTERVALO_PADRAO = 10
@@ -185,18 +183,18 @@ export function HorariosProfView() {
                         const invalida = f.horaInicio >= f.horaFim
                         return (
                           <div key={`${codigo}-${i}`} className="flex flex-wrap items-center gap-2">
-                            <input
-                              type="time"
+                            <TimeInput
                               value={f.horaInicio}
-                              onChange={(e) => alterar(codigo, i, 'horaInicio', e.target.value)}
-                              className={cn(TIME, invalida && 'border-red-alert')}
+                              onChange={(v) => alterar(codigo, i, 'horaInicio', v)}
+                              errorMessage={invalida ? ' ' : undefined}
+                              className="w-[140px]"
                             />
                             <span className="text-plum/40">até</span>
-                            <input
-                              type="time"
+                            <TimeInput
                               value={f.horaFim}
-                              onChange={(e) => alterar(codigo, i, 'horaFim', e.target.value)}
-                              className={cn(TIME, invalida && 'border-red-alert')}
+                              onChange={(v) => alterar(codigo, i, 'horaFim', v)}
+                              errorMessage={invalida ? ' ' : undefined}
+                              className="w-[140px]"
                             />
                             <button
                               type="button"

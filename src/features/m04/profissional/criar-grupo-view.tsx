@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton, ESButton, PageHeader, useToast } from '@/components/ui'
+import { BackButton, DateInput, ESButton, PageHeader, TimeInput, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
-import { reais } from '@/features/m04/lib/datas'
+import { hojeISO, reais } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
 
 type TipoSessao = components['schemas']['TipoSessao']
@@ -152,24 +152,8 @@ export function CriarGrupoView() {
                   </label>
 
                   <div className="flex flex-wrap gap-4">
-                    <label className="block">
-                      <span className="text-sm font-medium text-plum/70">Data</span>
-                      <input
-                        type="date"
-                        value={data}
-                        onChange={(e) => setData(e.target.value)}
-                        className={cn(INPUT, 'mt-1.5 w-auto')}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium text-plum/70">Horário</span>
-                      <input
-                        type="time"
-                        value={horario}
-                        onChange={(e) => setHorario(e.target.value)}
-                        className={cn(INPUT, 'mt-1.5 w-auto')}
-                      />
-                    </label>
+                    <DateInput label="Data" value={data} min={hojeISO()} onChange={setData} className="w-[190px]" />
+                    <TimeInput label="Horário" value={horario} onChange={setHorario} className="w-[150px]" />
                     <label className="block">
                       <span className="text-sm font-medium text-plum/70">Vagas</span>
                       <input

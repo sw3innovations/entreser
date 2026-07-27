@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ESButton, PageHeader, TrashIcon, useToast } from '@/components/ui'
+import { DateInput, ESButton, PageHeader, TrashIcon, useToast } from '@/components/ui'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useListaPaginada } from '@/features/m04/api/use-lista-paginada'
@@ -15,8 +15,6 @@ type Bloqueio = components['schemas']['BloqueioAgenda']
 type SessaoResumo = components['schemas']['SessaoResumo']
 
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
-const INPUT =
-  'rounded-input border border-plum/[0.14] bg-white px-3 py-2.5 text-[14.5px] text-plum outline-none transition-colors focus:border-mauve'
 
 /** `2026-12-20T00:00:00Z` → `20/12/2026` (a data do bloqueio é um dia inteiro). */
 function dataCurta(iso: string): string {
@@ -110,22 +108,22 @@ export function BloqueiosView() {
           {/* Novo bloqueio */}
           <section className={CARD}>
             <h3 className="font-display text-lg text-plum">Novo período</h3>
-            <div className="mt-3.5 flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-plum/70">De</span>
-                <input type="date" value={inicio} min={hojeISO()} onChange={(e) => setInicio(e.target.value)} className={INPUT} />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-plum/70">Até</span>
-                <input type="date" value={fim} min={inicio || hojeISO()} onChange={(e) => setFim(e.target.value)} className={INPUT} />
-              </label>
-              <ESButton variant="primary" onPress={criar} isLoading={salvando} isDisabled={!podeCriar}>
-                Bloquear período
-              </ESButton>
+            <div className="mt-3.5 flex flex-wrap items-start gap-3">
+              <DateInput label="De" value={inicio} min={hojeISO()} onChange={setInicio} className="w-[190px]" />
+              <DateInput
+                label="Até"
+                value={fim}
+                min={inicio || hojeISO()}
+                onChange={setFim}
+                errorMessage={periodoInvalido ? 'Precisa ser igual ou depois da data inicial.' : undefined}
+                className="w-[190px]"
+              />
+              <div className="pt-[26px]">
+                <ESButton variant="primary" onPress={criar} isLoading={salvando} isDisabled={!podeCriar}>
+                  Bloquear período
+                </ESButton>
+              </div>
             </div>
-            {periodoInvalido && (
-              <p className="mt-2 text-xs text-red-alert">A data final precisa ser igual ou depois da inicial.</p>
-            )}
             {podeCriar && (
               <p className="mt-2 text-xs text-plum/45">
                 {dias} {dias === 1 ? 'dia será bloqueado' : 'dias serão bloqueados'}.
