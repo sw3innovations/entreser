@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
@@ -8,6 +10,7 @@ import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { dataHoraPorExtenso, faixaHoraria, hora, reais } from '@/features/m04/lib/datas'
 import { STATUS_LABEL, STATUS_TOM, CANCELADA_POR_TEXTO } from '@/features/m04/lib/sessao'
+import { CancelarDialog } from './cancelar-dialog'
 import type { components } from '@/features/m04/api/schema'
 
 type Sessao = components['schemas']['Sessao']
@@ -28,7 +31,9 @@ function tituloDaSessao(s: Sessao, ehGrupo: boolean, nomeDoTipo?: string): strin
  * quando a regra das 24h mudar, esta tela não muda.
  */
 export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
+  const router = useRouter()
   const voltar = useVoltar('/sessoes')
+  const [cancelando, setCancelando] = useState(false)
   const { dados, carregando, erro, recarregar } = useRecurso<Sessao>(
     () => m04.GET('/sessoes/{sessaoId}', { params: { path: { sessaoId } } }),
     [sessaoId],
@@ -118,6 +123,7 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
             {dados.podeCancelar && (
               <button
                 type="button"
+                onClick={() => setCancelando(true)}
                 className="h-[50px] flex-1 rounded-full border border-mauve/30 bg-white text-[15px] font-semibold text-mauve transition-es active:scale-[0.99]"
               >
                 Cancelar sessão
@@ -126,6 +132,7 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
             {dados.podeReagendar && (
               <button
                 type="button"
+                onClick={() => router.push(`/sessoes/${sessaoId}/reagendar`)}
                 className="h-[50px] flex-1 rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99]"
               >
                 Reagendar
@@ -133,6 +140,19 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* U11 · cancelar (overlay). O backend devolve a sessão já cancelada — recarregamos
+          para a tela refletir o novo status sem inventar estado local. */}
+      {cancelando && dados && (
+        <CancelarDialog
+          sessao={dados}
+          onFechar={() => setCancelando(false)}
+          onCancelada={() => {
+            setCancelando(false)
+            recarregar()
+          }}
+        />
       )}
     </div>
   )
