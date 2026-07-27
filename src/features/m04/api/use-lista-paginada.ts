@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mensagemDe } from './erros'
+import { comRetry, mensagemDeRede } from './rede'
 
 type Pagina<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number }
 type Resultado<T> = { data?: Pagina<T>; error?: unknown; response: Response }
@@ -48,11 +49,11 @@ export function useListaPaginada<T>(
   // Página 0: primeira carga, mudança de `deps` ou `recarregar`.
   useEffect(() => {
     let ativo = true
-    fnRef.current(0)
+    comRetry(() => fnRef.current(0), () => ativo)
       .then((r) => {
         if (!ativo) return
         if (r.error) {
-          setErro(mensagemDe(codigo(r.error)))
+          setErro(codigo(r.error) ? mensagemDe(codigo(r.error)) : mensagemDeRede(r.response?.status))
           setItens([])
           setTotal(0)
           setTotalPages(0)
@@ -65,7 +66,7 @@ export function useListaPaginada<T>(
         }
       })
       .catch(() => {
-        if (ativo) setErro(mensagemDe())
+        if (ativo) setErro(mensagemDeRede())
       })
       .finally(() => {
         if (ativo) setCarregando(false)
@@ -79,10 +80,10 @@ export function useListaPaginada<T>(
   const carregarMais = useCallback(() => {
     const prox = page + 1
     setCarregandoMais(true)
-    fnRef.current(prox)
+    comRetry(() => fnRef.current(prox))
       .then((r) => {
         if (r.error) {
-          setErro(mensagemDe(codigo(r.error)))
+          setErro(codigo(r.error) ? mensagemDe(codigo(r.error)) : mensagemDeRede(r.response?.status))
         } else {
           setItens((cur) => [...cur, ...(r.data?.content ?? [])])
           setPage(prox)
@@ -92,7 +93,7 @@ export function useListaPaginada<T>(
           }
         }
       })
-      .catch(() => setErro(mensagemDe()))
+      .catch(() => setErro(mensagemDeRede()))
       .finally(() => setCarregandoMais(false))
   }, [page])
 

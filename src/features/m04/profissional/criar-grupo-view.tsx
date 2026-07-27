@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton, DateInput, ESButton, PageHeader, TimeInput, useToast } from '@/components/ui'
+import { BackButton, DateInput, ESButton, PageHeader, TextInput, TimeInput, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
@@ -54,7 +54,12 @@ export function CriarGrupoView() {
     setErro(null)
   }
 
-  const podeCriar = Boolean(tipo && titulo.trim() && data && horario && vagas) && !semValor
+  // As vagas precisam caber na faixa do catálogo — o backend recusaria com
+  // CAPACIDADE_INVALIDA, então a tela avisa antes.
+  const vagasForaDaFaixa =
+    info != null && vagas != null && (vagas < info.minParticipantes || vagas > info.maxParticipantes)
+  const podeCriar =
+    Boolean(tipo && titulo.trim() && data && horario && vagas) && !semValor && !vagasForaDaFaixa
 
   const criar = async () => {
     if (!podeCriar || salvando || !tipo || !vagas) return
@@ -154,20 +159,16 @@ export function CriarGrupoView() {
                   <div className="flex flex-wrap gap-4">
                     <DateInput label="Data" value={data} min={hojeISO()} onChange={setData} className="w-[190px]" />
                     <TimeInput label="Horário" value={horario} onChange={setHorario} className="w-[150px]" />
-                    <label className="block">
-                      <span className="text-sm font-medium text-plum/70">Vagas</span>
-                      <input
-                        type="number"
-                        value={vagas ?? ''}
-                        min={info.minParticipantes}
-                        max={info.maxParticipantes}
-                        onChange={(e) => setVagas(Number(e.target.value) || null)}
-                        className={cn(INPUT, 'mt-1.5 w-[110px]')}
-                      />
-                      <span className="mt-1 block text-xs text-plum/45">
-                        {info.minParticipantes} a {info.maxParticipantes}
-                      </span>
-                    </label>
+                    <TextInput
+                      label="Vagas"
+                      inputMode="numeric"
+                      maxLength={2}
+                      placeholder={`${info.minParticipantes} a ${info.maxParticipantes}`}
+                      value={vagas == null ? '' : String(vagas)}
+                      onChange={(v) => setVagas(Number(v.replace(/\D/g, '')) || null)}
+                      errorMessage={vagasForaDaFaixa ? `Entre ${info.minParticipantes} e ${info.maxParticipantes}.` : undefined}
+                      className="w-[150px]"
+                    />
                   </div>
                 </div>
               </section>

@@ -10,6 +10,7 @@ import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { dataHoraPorExtenso, faixaHoraria, hora, reais } from '@/features/m04/lib/datas'
 import { STATUS_LABEL, STATUS_TOM, CANCELADA_POR_TEXTO } from '@/features/m04/lib/sessao'
+import { CancelarDialog } from '@/features/m04/ui/cancelar-dialog'
 import { RegistrarDialog } from './registrar-dialog'
 import type { components } from '@/features/m04/api/schema'
 
@@ -30,6 +31,7 @@ const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px
 export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
   const { showToast } = useToast()
   const [registrando, setRegistrando] = useState(false)
+  const [cancelando, setCancelando] = useState(false)
   const [marcando, setMarcando] = useState<string | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
 
@@ -235,6 +237,14 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
                         Registrar sessão
                       </ESButton>
                     )}
+                    {/* PF7 — a profissional cancela a qualquer momento enquanto a sessão
+                        está ativa, inclusive depois do horário e ainda sem registro. Quem
+                        decide é `podeCancelar`; as duas ações convivem (D16). */}
+                    {dados.podeCancelar && (
+                      <ESButton variant="secondary" onPress={() => setCancelando(true)}>
+                        Cancelar sessão
+                      </ESButton>
+                    )}
                   </div>
                   {dados.pendenteRegistro && (
                     <p className="mt-2.5 text-xs leading-relaxed text-plum/45">
@@ -255,6 +265,19 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
           onRegistrada={() => {
             setRegistrando(false)
             showToast('Sessão registrada.', 'success')
+            recarregar()
+          }}
+        />
+      )}
+
+      {cancelando && dados && (
+        <CancelarDialog
+          perfil="profissional"
+          sessao={dados}
+          onFechar={() => setCancelando(false)}
+          onCancelada={() => {
+            setCancelando(false)
+            showToast('Sessão cancelada.', 'success')
             recarregar()
           }}
         />

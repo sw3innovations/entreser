@@ -10,7 +10,7 @@ import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { dataHoraPorExtenso, faixaHoraria, hora, reais } from '@/features/m04/lib/datas'
 import { STATUS_LABEL, STATUS_TOM, CANCELADA_POR_TEXTO } from '@/features/m04/lib/sessao'
-import { CancelarDialog } from './cancelar-dialog'
+import { CancelarDialog } from '@/features/m04/ui/cancelar-dialog'
 import type { components } from '@/features/m04/api/schema'
 
 type Sessao = components['schemas']['Sessao']

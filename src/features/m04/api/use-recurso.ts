@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { mensagemDe } from './erros'
+import { comRetry, mensagemDeRede } from './rede'
 
 /** Formato de retorno de uma chamada `openapi-fetch` (`{ data, error, response }`). */
 type Resultado<T> = { data?: T; error?: unknown; response: Response }
@@ -44,11 +45,15 @@ export function useRecurso<T>(
 
   useEffect(() => {
     let ativo = true
-    fnRef.current()
+    // Falha de rede repete até 2x (D19); erro do servidor, não — ele já respondeu.
+    comRetry(() => fnRef.current(), () => ativo)
       .then((r) => {
         if (!ativo) return
         if (r.error) {
-          setErro(mensagemDe((r.error as { code?: string } | undefined)?.code))
+          // Erro de negócio traz `code`; 5xx não traz nada útil, então a mensagem vem
+          // da camada de rede ("o servidor não respondeu") em vez do genérico.
+          const code = (r.error as { code?: string } | undefined)?.code
+          setErro(code ? mensagemDe(code) : mensagemDeRede(r.response?.status))
           setDados(null)
         } else {
           setDados((r.data ?? null) as T | null)
@@ -56,7 +61,7 @@ export function useRecurso<T>(
         }
       })
       .catch(() => {
-        if (ativo) setErro(mensagemDe())
+        if (ativo) setErro(mensagemDeRede())
       })
       .finally(() => {
         if (ativo) setCarregando(false)

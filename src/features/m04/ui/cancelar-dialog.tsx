@@ -12,21 +12,30 @@ interface Props {
   onFechar: () => void
   /** Recebe a sessão já cancelada (o backend devolve o agregado atualizado). */
   onCancelada: (s: Sessao) => void
+  /**
+   * Quem está cancelando. Muda só o texto: a usuária pode ter cobrança quando faltam
+   * menos de 24h; a profissional cancela a qualquer momento, sem penalidade (PF7). O
+   * endpoint e o corpo são os mesmos para as duas.
+   */
+  perfil?: 'usuaria' | 'profissional'
 }
 
 /**
- * U11 · Cancelar sessão — overlay sobre a U10. O aviso de cobrança sai de
- * `podeCancelarSemCobranca` (campo pronto; a tela não calcula prazo). A resposta é um
- * `CancelamentoResponse`, que EMBRULHA a sessão em `.sessao` — diferente das outras
- * escritas, que devolvem `Sessao` direta. `percentualCobrado` fica oculto enquanto vier
- * nulo (D27): no MVP a tela fala só "com custo" / "sem custo".
+ * Cancelar sessão — overlay sobre o detalhe (U11 na usuária, PF7 na profissional).
+ *
+ * O aviso de cobrança sai de `podeCancelarSemCobranca` (campo pronto; a tela não calcula
+ * prazo). A resposta é um `CancelamentoResponse`, que EMBRULHA a sessão em `.sessao` —
+ * diferente das outras escritas, que devolvem `Sessao` direta. `percentualCobrado` fica
+ * oculto enquanto vier nulo (D27): no MVP a tela fala só "com custo" / "sem custo".
  */
-export function CancelarDialog({ sessao, onFechar, onCancelada }: Props) {
+export function CancelarDialog({ sessao, onFechar, onCancelada, perfil = 'usuaria' }: Props) {
   const [motivo, setMotivo] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const comCobranca = !sessao.podeCancelarSemCobranca
+  const ehProfissional = perfil === 'profissional'
+  // Só a usuária pode ter cobrança; a profissional cancela sem penalidade (PF7).
+  const comCobranca = !ehProfissional && !sessao.podeCancelarSemCobranca
 
   const cancelar = async () => {
     if (enviando) return
@@ -54,9 +63,11 @@ export function CancelarDialog({ sessao, onFechar, onCancelada }: Props) {
       <div className="w-full max-w-md rounded-t-card bg-white p-6 shadow-modal sm:rounded-card">
         <h2 className="font-display text-2xl text-plum">Cancelar esta sessão?</h2>
         <p className="mt-2 text-[14.5px] leading-relaxed text-plum/65">
-          {comCobranca
-            ? 'Faltam menos de 24 horas para esta sessão, então o cancelamento tem custo.'
-            : 'Você pode cancelar sem custo — ainda faltam mais de 24 horas.'}
+          {ehProfissional
+            ? 'A usuária será avisada. Esta ação não pode ser desfeita.'
+            : comCobranca
+              ? 'Faltam menos de 24 horas para esta sessão, então o cancelamento tem custo.'
+              : 'Você pode cancelar sem custo — ainda faltam mais de 24 horas.'}
         </p>
 
         <label className="mt-4 block">
@@ -66,7 +77,11 @@ export function CancelarDialog({ sessao, onFechar, onCancelada }: Props) {
             onChange={(e) => setMotivo(e.target.value)}
             maxLength={1000}
             rows={3}
-            placeholder="Se quiser, conte o que aconteceu — a profissional vai ver."
+            placeholder={
+              ehProfissional
+                ? 'Se quiser, explique o motivo — a usuária vai ver.'
+                : 'Se quiser, conte o que aconteceu — a profissional vai ver.'
+            }
             className="mt-1.5 w-full resize-none rounded-input border border-plum/[0.14] bg-white px-4 py-3 text-[14.5px] text-plum outline-none transition-colors placeholder:text-plum/35 focus:border-mauve"
           />
         </label>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BackButton, ESButton, PageHeader, useToast } from '@/components/ui'
+import { BackButton, ESButton, PageHeader, TextInput, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
@@ -94,16 +94,19 @@ export function SalaView({ sessaoId }: { sessaoId: string }) {
 
               <section className={CARD}>
                 <h3 className="font-display text-lg text-plum">2. Cole o endereço</h3>
-                <input
-                  value={link}
-                  onChange={(e) => { setLink(e.target.value); setErro(null) }}
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                  className="mt-3 w-full rounded-input border border-plum/[0.14] bg-white px-4 py-3 text-[14.5px] text-plum outline-none transition-colors placeholder:text-plum/35 focus:border-mauve"
-                />
-                {link.trim() && !pareceUrl && (
-                  <p className="mt-1.5 text-xs text-red-alert">Cole o endereço completo, começando com https://</p>
-                )}
-                {erro && <p className="mt-2 text-[13.5px] font-medium text-red-alert">{erro}</p>}
+                <div className="mt-3">
+                  <TextInput
+                    type="url"
+                    value={link}
+                    onChange={(v) => { setLink(v); setErro(null) }}
+                    placeholder="https://meet.google.com/abc-defg-hij"
+                    errorMessage={
+                      link.trim() && !pareceUrl
+                        ? 'Cole o endereço completo, começando com https://'
+                        : (erro ?? undefined)
+                    }
+                  />
+                </div>
                 <div className="mt-4 flex justify-end">
                   <ESButton variant="primary" onPress={salvar} isLoading={salvando} isDisabled={!podeSalvar}>
                     Salvar link da sala
