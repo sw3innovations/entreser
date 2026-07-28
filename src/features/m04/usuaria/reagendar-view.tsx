@@ -48,7 +48,7 @@ export function ReagendarView({ sessaoId }: { sessaoId: string }) {
 
   // Os slots dependem da sessão (profissional + tipo). Enquanto ela não chega, não há o
   // que buscar — daí a resposta vazia em vez de um `sessao!`, que quebraria no 1º render.
-  const { dados: slotsResp, carregando: carregandoSlots } = useRecurso(
+  const { dados: slotsResp, carregando: carregandoSlots, recarregar: recarregarSlots } = useRecurso(
     () =>
       sessao
         ? m04.GET('/profissionais/{profissionalId}/slots', {
@@ -74,7 +74,12 @@ export function ReagendarView({ sessaoId }: { sessaoId: string }) {
         body: { dataHora: slot.inicio },
       })
       if (error) {
-        setErro(mensagemDe((error as { code?: string }).code))
+        const code = (error as { code?: string }).code
+        setErro(mensagemDe(code))
+        // O horário foi tomado entre a lista chegar e o clique — a lista na tela está
+        // velha. Recarregar é o que faz a mensagem ser acionável: sem isso, a pessoa
+        // insiste no mesmo horário que já não existe.
+        if (code === 'SLOT_JA_OCUPADO' || code === 'SLOT_INDISPONIVEL') recarregarSlots()
         return
       }
       if (data) router.replace(`/sessoes/${sessaoId}`)

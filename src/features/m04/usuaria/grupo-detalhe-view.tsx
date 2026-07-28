@@ -34,6 +34,17 @@ export function GrupoDetalheView({ tipo, sessaoId }: { tipo: TipoSessao; sessaoI
     [sessaoId],
   )
 
+  /**
+   * Conflitos que significam "a tela está velha": as vagas acabaram, a inscrição já
+   * existia ou já não existe. Nesses casos recarregar é parte da mensagem — sem isso a
+   * pessoa lê "as vagas acabaram" olhando para um botão que ainda diz "Inscrever-se".
+   */
+  const recarregarSeDesatualizou = (code?: string) => {
+    if (code === 'SESSAO_LOTADA' || code === 'JA_INSCRITA' || code === 'NAO_INSCRITA') {
+      recarregar()
+    }
+  }
+
   const inscrever = async () => {
     if (enviando) return
     setEnviando(true)
@@ -44,6 +55,10 @@ export function GrupoDetalheView({ tipo, sessaoId }: { tipo: TipoSessao; sessaoI
       })
       if (error) {
         setErro(mensagemDe((error as { code?: string }).code))
+        // Estes três dizem que a tela está velha: as vagas acabaram enquanto ela lia, ou
+        // a inscrição já existia. Recarregar deixa o botão e as vagas refletirem o agora
+        // — senão a mensagem aparece sobre uma tela que ainda diz "há vaga".
+        recarregarSeDesatualizou((error as { code?: string }).code)
         return
       }
       router.push(`/sessoes/${sessaoId}`)
@@ -64,6 +79,7 @@ export function GrupoDetalheView({ tipo, sessaoId }: { tipo: TipoSessao; sessaoI
       })
       if (error) {
         setErro(mensagemDe((error as { code?: string }).code))
+        recarregarSeDesatualizou((error as { code?: string }).code)
         return
       }
       recarregar()
