@@ -25,9 +25,21 @@ export const STATUS_TOM: Record<StatusSessao, string> = {
   NaoCompareceu: 'bg-red-alert/[0.10] text-red-alert',
 }
 
-/** Quem cancelou → o texto que a usuária lê. */
+/**
+ * Quem cancelou → o texto de quem está lendo. O mesmo `canceladoPor` significa coisas
+ * opostas nos dois painéis: `Usuaria` é "você" para a usuária e "a usuária" para a
+ * profissional. Usar um mapa só faria a profissional ler "Você cancelou" quando quem
+ * cancelou foi a outra pessoa.
+ */
 export const CANCELADA_POR_TEXTO: Record<CanceladoPor, string> = {
   Usuaria: 'Você cancelou esta sessão.',
   Profissional: 'A profissional cancelou esta sessão.',
   Sistema: 'Esta sessão foi cancelada por não atingir o número mínimo de participantes.',
+}
+
+/** O mesmo, na leitura da profissional. */
+export const CANCELADA_POR_TEXTO_PROF: Record<CanceladoPor, string> = {
+  Usuaria: 'A usuária cancelou esta sessão.',
+  Profissional: 'Você cancelou esta sessão.',
+  Sistema: 'Cancelada automaticamente por não atingir o número mínimo de participantes.',
 }

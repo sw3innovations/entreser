@@ -9,7 +9,7 @@ import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { dataHoraPorExtenso, faixaHoraria, hora, reais } from '@/features/m04/lib/datas'
-import { STATUS_LABEL, STATUS_TOM, CANCELADA_POR_TEXTO } from '@/features/m04/lib/sessao'
+import { STATUS_LABEL, STATUS_TOM, CANCELADA_POR_TEXTO_PROF } from '@/features/m04/lib/sessao'
 import { CancelarDialog } from '@/features/m04/ui/cancelar-dialog'
 import { RegistrarDialog } from './registrar-dialog'
 import type { components } from '@/features/m04/api/schema'
@@ -180,7 +180,7 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
               {/* Cancelamento */}
               {dados.status === 'Cancelada' && dados.canceladaPor && (
                 <section className={CARD}>
-                  <p className="text-[13.5px] text-plum/70">{CANCELADA_POR_TEXTO[dados.canceladaPor]}</p>
+                  <p className="text-[13.5px] text-plum/70">{CANCELADA_POR_TEXTO_PROF[dados.canceladaPor]}</p>
                   {dados.motivoCancelamento && (
                     <p className="mt-1.5 text-[13px] italic text-plum/50">“{dados.motivoCancelamento}”</p>
                   )}

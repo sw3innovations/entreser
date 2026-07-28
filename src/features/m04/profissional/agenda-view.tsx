@@ -54,6 +54,11 @@ export function AgendaView() {
   const [pagina, setPagina] = useState(0)
   const [acumulado, setAcumulado] = useState<SessaoResumo[]>([])
 
+  // Nome do tipo vem do catálogo — nada de rótulo escrito na tela.
+  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const nomeDoTipo = (codigo: SessaoResumo['tipo']) =>
+    catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
+
   const { de, ate } = janela()
   const { dados, carregando, erro, recarregar } = useRecurso(
     () =>
@@ -181,7 +186,11 @@ export function AgendaView() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-display text-[16.5px] leading-tight text-plum">
-                          {s.tituloGrupo ?? s.profissional.nome}
+                          {/* Grupo mostra o tema; individual mostra o TIPO. Nunca
+                              `profissional.nome`: no painel dela, seria o nome dela mesma.
+                              O nome da usuária não está em `SessaoResumo` — para exibi-lo
+                              o contrato precisaria carregar a participante no resumo. */}
+                          {s.tituloGrupo ?? nomeDoTipo(s.tipo)}
                         </h3>
                         <span
                           className={cn(
@@ -202,9 +211,11 @@ export function AgendaView() {
                           </span>
                         )}
                       </div>
-                      {s.vagasDisponiveis != null && s.vagas != null && s.vagas > 0 && (
+                      {/* `totalParticipantes` vem pronto do backend — subtrair vagas daria
+                          o número errado assim que alguém desistisse (D7). */}
+                      {s.totalParticipantes != null && s.vagas != null && s.vagas > 0 && (
                         <p className="mt-1 text-xs text-plum/45">
-                          {s.vagas - s.vagasDisponiveis} de {s.vagas} inscritas
+                          {s.totalParticipantes} de {s.vagas} inscritas
                         </p>
                       )}
                     </div>

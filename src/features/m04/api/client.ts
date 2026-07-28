@@ -20,5 +20,15 @@ const auth: Middleware = {
   },
 }
 
-export const m04 = createClient<paths>({ baseUrl: '/m04-api' })
+export const m04 = createClient<paths>({
+  baseUrl: '/m04-api',
+  /**
+   * O contrato declara `style: form` + `explode: false` em todos os parâmetros de array
+   * (status, tipo, linkMeetStatus) — ou seja, `?status=Agendada,Confirmada`. O default do
+   * openapi-fetch repete o parâmetro (`?status=A&status=B`), e um servidor que siga o
+   * contrato à risca leria só um valor. Os tipos gerados não carregam `style`/`explode`,
+   * então isso não aparece em tempo de compilação.
+   */
+  querySerializer: { array: { style: 'form', explode: false } },
+})
 m04.use(auth)

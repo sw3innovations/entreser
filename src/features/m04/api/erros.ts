@@ -15,6 +15,7 @@ export const MENSAGENS: Record<string, string> = {
   PRAZO_REAGENDAMENTO: 'Não dá para reagendar com menos de 24 horas. Você ainda pode cancelar a sessão.',
   VALOR_NAO_DEFINIDO: 'Esta profissional não oferece este tipo de sessão.',
   PERIODO_INVALIDO: 'Confira as datas informadas.',
+  PARAMETRO_INVALIDO: 'Confira os dados informados e tente de novo.',
   JANELA_MUITO_LONGA: 'O período consultado é muito longo. Escolha um intervalo menor.',
 
   // Grupo / inscrição
