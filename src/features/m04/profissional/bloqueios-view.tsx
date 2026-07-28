@@ -8,7 +8,7 @@ import { useListaPaginada } from '@/features/m04/api/use-lista-paginada'
 import { Estado } from '@/features/m04/ui/estado'
 import { VerMais } from '@/features/m04/ui/ver-mais'
 import { SessoesAfetadas } from './sessoes-afetadas'
-import { hojeISO } from '@/features/m04/lib/datas'
+import { fimDoDiaUTC, hojeISO, inicioDoDiaUTC } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
 
 type Bloqueio = components['schemas']['BloqueioAgenda']
@@ -54,10 +54,11 @@ export function BloqueiosView() {
     setSalvando(true)
     setErro(null)
     try {
-      // O contrato pede `date-time`; o <input type="date"> devolve só a data. O bloqueio
-      // cobre os dias inteiros, então o início vai à meia-noite e o fim ao último segundo.
+      // O contrato pede `date-time` em UTC; o campo devolve a data LOCAL. O bloqueio cobre
+      // os dias inteiros no fuso da profissional, então a conversão precisa passar pelo
+      // fuso — concatenar `Z` deslocaria o período (em Brasília, 3h para trás).
       const { data, error } = await m04.POST('/profissional/bloqueios', {
-        body: { dataInicio: `${inicio}T00:00:00Z`, dataFim: `${fim}T23:59:59Z` },
+        body: { dataInicio: inicioDoDiaUTC(inicio), dataFim: fimDoDiaUTC(fim) },
       })
       if (error) {
         setErro(mensagemDe((error as { code?: string }).code))

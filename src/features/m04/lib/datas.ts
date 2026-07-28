@@ -35,6 +35,23 @@ export function faixaHoraria(inicio: string, fim: string): string {
   return `${hora(inicio)} – ${hora(fim)}`
 }
 
+/**
+ * Data local (`YYYY-MM-DD`) → instante UTC do INÍCIO desse dia, como o contrato pede
+ * (`date-time` com `Z`).
+ *
+ * Concatenar `T00:00:00Z` na data seria tratar a data local como se já fosse UTC: em
+ * Brasília (UTC-3), "20/12" viraria 19/12 às 21:00 — três horas antes do que a pessoa
+ * escolheu. Aqui a string sem `Z` é interpretada no fuso local e só então convertida.
+ */
+export function inicioDoDiaUTC(dataLocal: string): string {
+  return new Date(`${dataLocal}T00:00:00`).toISOString()
+}
+
+/** Data local (`YYYY-MM-DD`) → instante UTC do FIM desse dia (23:59:59 local). */
+export function fimDoDiaUTC(dataLocal: string): string {
+  return new Date(`${dataLocal}T23:59:59`).toISOString()
+}
+
 /** `YYYY-MM-DD` de hoje (parâmetro `inicio` do endpoint de slots, que é `date`). */
 export function hojeISO(): string {
   const d = new Date()

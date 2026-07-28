@@ -10,40 +10,77 @@ type Sessao = components['schemas']['Sessao']
 
 type Acao = 'realizada' | 'faltou' | 'cancelar'
 
-const ACOES: { chave: Acao; rotulo: string; descricao: string; tom: 'neutro' | 'alerta' }[] = [
-  {
-    chave: 'realizada',
-    rotulo: 'A sessão aconteceu',
-    descricao: 'Registra a sessão como realizada.',
-    tom: 'neutro',
-  },
-  {
-    chave: 'faltou',
-    rotulo: 'A usuária não compareceu',
-    descricao: 'Registra a falta. Ela passa a contar no histórico da usuária.',
-    tom: 'alerta',
-  },
-  {
+interface OpcaoAcao {
+  chave: Acao
+  rotulo: string
+  descricao: string
+  tom: 'neutro' | 'alerta'
+}
+
+/**
+ * As ações mudam por tipo de sessão. `PATCH /nao-compareceu` é declarado no contrato como
+ * **aplicável a sessões individuais** — num grupo a falta é de cada participante, marcada
+ * uma a uma na P2, e o fechamento é `PATCH /realizada`. Oferecer "não compareceu" num
+ * grupo levaria o encontro inteiro a um estado final sem nenhuma presença registrada.
+ */
+function acoesDe(ehGrupo: boolean): OpcaoAcao[] {
+  const realizada: OpcaoAcao = ehGrupo
+    ? {
+        chave: 'realizada',
+        rotulo: 'Encerrar sessão',
+        descricao: 'Fecha o encontro com as presenças que você registrou.',
+        tom: 'neutro',
+      }
+    : {
+        chave: 'realizada',
+        rotulo: 'A sessão aconteceu',
+        descricao: 'Registra a sessão como realizada.',
+        tom: 'neutro',
+      }
+
+  const cancelar: OpcaoAcao = {
     chave: 'cancelar',
     rotulo: 'Cancelar a sessão',
     descricao: 'Use quando a sessão não aconteceu e não deve contar como falta.',
     tom: 'alerta',
-  },
-]
+  }
+
+  if (ehGrupo) return [realizada, cancelar]
+
+  return [
+    realizada,
+    {
+      chave: 'faltou',
+      rotulo: 'A usuária não compareceu',
+      descricao: 'Registra a falta. Ela passa a contar no histórico da usuária.',
+      tom: 'alerta',
+    },
+    cancelar,
+  ]
+}
 
 /**
  * P3 · Registrar o que aconteceu — overlay sobre a P2, sem carregar nada próprio.
  *
- * As TRÊS ações levam a um estado final e imutável, e por isso as três passam por uma
+ * TODAS as ações levam a um estado final e imutável, e por isso todas passam por uma
  * etapa de confirmação (D17) — inclusive "aconteceu". Confirmar só a falta e o
  * cancelamento sugeriria que registrar a realização é reversível, e não é.
+ *
+ * Em grupo, encerrar só é liberado depois que todas as presenças foram registradas (P3):
+ * fechar antes disso deixaria participantes sem presença num estado que não volta atrás.
  */
 export function RegistrarDialog({
   sessao,
+  ehGrupo = false,
+  presencasPendentes = 0,
   onFechar,
   onRegistrada,
 }: {
   sessao: Sessao
+  /** Vem da `categoria` do catálogo — o tipo de sessão decide quais ações existem. */
+  ehGrupo?: boolean
+  /** Participantes ativos ainda sem presença registrada. Trava o "Encerrar". */
+  presencasPendentes?: number
   onFechar: () => void
   onRegistrada: () => void
 }) {
@@ -51,7 +88,9 @@ export function RegistrarDialog({
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const acao = ACOES.find((a) => a.chave === escolha)
+  const acoes = acoesDe(ehGrupo)
+  const acao = acoes.find((a) => a.chave === escolha)
+  const encerrarTravado = ehGrupo && presencasPendentes > 0
 
   const confirmar = async () => {
     if (!escolha || enviando) return
@@ -87,29 +126,37 @@ export function RegistrarDialog({
               O registro é definitivo e não pode ser desfeito.
             </p>
             <div className="mt-4 flex flex-col gap-2.5">
-              {ACOES.map((a) => (
-                <button
-                  key={a.chave}
-                  type="button"
-                  onClick={() => setEscolha(a.chave)}
-                  className={cn(
-                    'rounded-input border p-4 text-left transition-es',
-                    a.tom === 'alerta'
-                      ? 'border-red-alert/25 bg-red-alert/[0.04] hover:border-red-alert/45'
-                      : 'border-plum/12 bg-white hover:border-mauve/40',
-                  )}
-                >
-                  <span
+              {acoes.map((a) => {
+                const travada = a.chave === 'realizada' && encerrarTravado
+                return (
+                  <button
+                    key={a.chave}
+                    type="button"
+                    onClick={() => setEscolha(a.chave)}
+                    disabled={travada}
                     className={cn(
-                      'block text-[14.5px] font-semibold',
-                      a.tom === 'alerta' ? 'text-red-alert' : 'text-plum',
+                      'rounded-input border p-4 text-left transition-es disabled:cursor-not-allowed disabled:opacity-50',
+                      a.tom === 'alerta'
+                        ? 'border-red-alert/25 bg-red-alert/[0.04] hover:border-red-alert/45'
+                        : 'border-plum/12 bg-white hover:border-mauve/40',
                     )}
                   >
-                    {a.rotulo}
-                  </span>
-                  <span className="mt-0.5 block text-[12.5px] text-plum/55">{a.descricao}</span>
-                </button>
-              ))}
+                    <span
+                      className={cn(
+                        'block text-[14.5px] font-semibold',
+                        a.tom === 'alerta' ? 'text-red-alert' : 'text-plum',
+                      )}
+                    >
+                      {a.rotulo}
+                    </span>
+                    <span className="mt-0.5 block text-[12.5px] text-plum/55">
+                      {travada
+                        ? `Registre a presença de ${presencasPendentes === 1 ? 'mais 1 participante' : `mais ${presencasPendentes} participantes`} antes de encerrar.`
+                        : a.descricao}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
             <button
               type="button"

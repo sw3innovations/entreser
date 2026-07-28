@@ -261,6 +261,8 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
       {registrando && dados && (
         <RegistrarDialog
           sessao={dados}
+          ehGrupo={ehGrupo}
+          presencasPendentes={ativos.length - registrados}
           onFechar={() => setRegistrando(false)}
           onRegistrada={() => {
             setRegistrando(false)

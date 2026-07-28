@@ -122,13 +122,16 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
       {dados && (dados.podeCancelar || dados.podeReagendar) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-plum/[0.06] bg-[rgba(255,253,250,0.9)] shadow-[0_-6px_24px_rgba(45,24,64,0.08)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-[11px] px-[18px] pb-[18px] pt-[14px]">
+            {/* Em grupo a saída é DESISTIR da própria inscrição — cancelar encerraria o
+                encontro para todas as inscritas. Quem diz se é grupo é a `categoria` do
+                catálogo, não um palpite sobre `vagas`. */}
             {dados.podeCancelar && (
               <button
                 type="button"
                 onClick={() => setCancelando(true)}
                 className="h-[50px] flex-1 rounded-full border border-mauve/30 bg-white text-[15px] font-semibold text-mauve transition-es active:scale-[0.99]"
               >
-                Cancelar sessão
+                {ehGrupo ? 'Cancelar minha inscrição' : 'Cancelar sessão'}
               </button>
             )}
             {dados.podeReagendar && (
@@ -149,6 +152,7 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
       {cancelando && dados && (
         <CancelarDialog
           sessao={dados}
+          acao={ehGrupo ? 'sairDoGrupo' : 'cancelarSessao'}
           onFechar={() => setCancelando(false)}
           onCancelada={() => {
             setCancelando(false)
