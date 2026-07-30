@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { ESAvatar, ESProgressBar, ESSkeleton, ConteudosIcon, TrilhasIcon } from '@/components/ui'
+import { ESAvatar, ESProgressBar, ESSkeleton, ConteudosIcon, TrilhasIcon, AgendaIcon } from '@/components/ui'
 import { useAuth } from '@/features/auth/context/auth-context'
 import { PlumHero, GlassCard, ContentCard, ChevronRightIcon } from '../ui'
 import { useMinhaFase } from '../fase/use-minha-fase'
@@ -17,7 +17,7 @@ import type { ContentItemVM } from '../lib/content'
  * HomeView — landing do app da Usuária. Responsiva: no mobile é uma coluna única
  * (card de fase sobreposto ao hero, vitrine em carrossel); no desktop usa a
  * largura — banda superior com fase + atalhos lado a lado e vitrine em grade.
- * Escopada ao M05 (sem links para módulos ainda não construídos).
+ * Inclui o atalho para o M04 (agendar/ver sessões) além do escopo original M05.
  */
 export function HomeView() {
   const { user } = useAuth()
@@ -95,11 +95,45 @@ export function HomeView() {
 
         {/* Atalhos — só no mobile; no desktop a sidebar cobre a navegação */}
         <div className="grid grid-cols-2 gap-3 pt-4 lg:hidden">
+          <QuickTile href="/sessoes" label="Ver minhas consultas" icon={<AgendaIcon />} />
           <QuickTile href="/feed" label="Explorar conteúdos" icon={<ConteudosIcon />} />
           <QuickTile href="/trilhas" label="Ver trilhas" icon={<TrilhasIcon />} />
         </div>
 
         <div className="space-y-8 py-8">
+          {/* Consulta — atalho de destaque para agendar/ver sessões (M04). A sidebar
+              do desktop não tem essa aba ainda, então o card fica visível nos dois
+              tamanhos, diferente dos QuickTiles mobile-only acima. O card inteiro leva
+              para "minhas sessões"; o botão "Agendar" pula direto para o fluxo de
+              marcação (`/agendar`), sem precisar passar pela lista vazia primeiro. */}
+          <section>
+            <GlassCard className="p-5">
+              <Link href="/sessoes" className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-mauve to-mauve-dark text-white">
+                    <AgendaIcon size={18} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-eyebrow text-mauve">Consulta</p>
+                    <p className="truncate font-display text-lg text-plum">Ver minhas sessões</p>
+                  </div>
+                </div>
+                <span className="shrink-0 text-plum/30">
+                  <ChevronRightIcon size={20} />
+                </span>
+              </Link>
+              <p className="mt-3 text-sm leading-relaxed text-plum/60">
+                Acompanhe o que está marcado ou agende um novo horário com sua profissional.
+              </p>
+              <Link
+                href="/agendar"
+                className="mt-4 inline-flex h-10 items-center rounded-full bg-mauve px-5 text-sm font-semibold text-cream transition-es hover:bg-mauve-dark active:scale-[0.98]"
+              >
+                Agendar consulta
+              </Link>
+            </GlassCard>
+          </section>
+
           {/* Continue de onde parou */}
           {emAndamento && (
             <section>
