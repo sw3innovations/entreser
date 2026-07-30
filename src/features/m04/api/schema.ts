@@ -1186,6 +1186,20 @@ export interface components {
              * @example false
              */
             jaInscrita?: boolean | null;
+            /**
+             * @description Nome da participante da sessão individual ou de casal, para a agenda da
+             *     profissional. Preenchido apenas em `GET /profissional/agenda`; nulo nas
+             *     listagens da usuária (onde seria o próprio nome dela) e em sessões de grupo
+             *     (que se identificam por `tituloGrupo`).
+             *
+             *     **Existe para a profissional ver de relance com quem é cada atendimento.**
+             *     Sem este campo, `SessaoResumo` só traz `profissional` — no painel dela, o
+             *     nome dela mesma — e a agenda cairia no nome do tipo ("Individual"), sem
+             *     dizer quem. Espelha `pendenteRegistro`/`jaInscrita`: opcional, preenchido
+             *     por contexto, nunca calculado no cliente.
+             * @example Ana Souza
+             */
+            participanteNome?: string | null;
         };
         /**
          * @description Detalhe público de uma sessão de grupo aberta a inscrições — a tela que precede
