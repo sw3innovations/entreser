@@ -6,16 +6,23 @@ import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
+import { useRecurso } from '@/features/m04/api/use-recurso'
 import { dataHoraPorExtenso, faixaHoraria } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
 
 type TipoSessao = components['schemas']['TipoSessao']
+type ProfissionalDetalhe = components['schemas']['ProfissionalDetalhe']
+type TiposSessaoResponse = components['schemas']['TiposSessaoResponse']
 
 interface Props {
   tipo: TipoSessao
   profissionalId: string
   inicio: string
   fim: string
+}
+
+function reais(valor: number): string {
+  return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 /**
@@ -33,6 +40,14 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
   const [erro, setErro] = useState<string | null>(null)
   const [slotOcupado, setSlotOcupado] = useState(false)
   const [emailParceira, setEmailParceira] = useState('')
+
+  const { dados: profissional } = useRecurso<ProfissionalDetalhe>(
+    () => m04.GET('/profissionais/{profissionalId}', { params: { path: { profissionalId } } }),
+    [profissionalId],
+  )
+  const { dados: catalogo } = useRecurso<TiposSessaoResponse>(() => m04.GET('/tipos-sessao'), [])
+  const tipoInfo = catalogo?.tipos.find((t) => t.codigo === tipo)
+  const valor = profissional?.tiposOferecidos?.find((t) => t.tipoSessao === tipo)?.valor ?? null
 
   const horarios = `/agendar/${tipo}/${profissionalId}/horarios`
   // U6: sessão de casal ganha o campo de e-mail da parceira. O convite NUNCA segura a
@@ -94,8 +109,16 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
               </dd>
               <dd className="mt-0.5 text-[13px] text-plum/50">{faixaHoraria(inicio, fim)}</dd>
             </div>
+            {profissional && <Linha rotulo="Com" valor={profissional.nome} />}
+            {tipoInfo && <Linha rotulo="Tipo" valor={tipoInfo.nome} />}
+            {tipoInfo && <Linha rotulo="Duração" valor={`${tipoInfo.duracaoMinutos} minutos`} />}
+            {valor != null && <Linha rotulo="Valor" valor={reais(valor)} />}
           </dl>
         </div>
+
+        <p className="mt-4 rounded-input border border-plum/8 bg-white px-4 py-3 text-[13px] leading-relaxed text-plum/60">
+          Você pode cancelar ou reagendar até 24 horas antes, sem custo.
+        </p>
 
         {/* U6 · casal: convidar a parceira é opcional e não segura a sessão (D4). */}
         {ehCasal && (
@@ -150,6 +173,15 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="text-[13px] text-plum/50">{rotulo}</dt>
+      <dd className="text-[14.5px] font-medium text-plum">{valor}</dd>
     </div>
   )
 }

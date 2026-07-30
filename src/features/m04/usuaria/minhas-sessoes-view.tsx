@@ -20,10 +20,15 @@ type StatusSessao = components['schemas']['StatusSessao']
 /**
  * Filtros da tela. "Agendadas" cobre `Agendada` e `Confirmada` — são o mesmo estado
  * visual (D8), inclusive aqui.
+ *
+ * "Próximas" e "Anteriores" usam `de`/`ate` (não só `status`) para separar passado e
+ * futuro de fato — sem isso, uma sessão `Cancelada` no passado não caía em filtro
+ * nenhum. `de`/`ate` é recalculado a cada clique (ver `useListaPaginada` abaixo), então
+ * aqui basta guardar como montar a query.
  */
-const FILTROS: { chave: string; label: string; status?: StatusSessao[] }[] = [
-  { chave: 'proximas', label: 'Próximas', status: ['Agendada', 'Confirmada'] },
-  { chave: 'realizadas', label: 'Realizadas', status: ['Realizada'] },
+const FILTROS: { chave: string; label: string; status?: StatusSessao[]; periodo?: 'proximas' | 'anteriores' }[] = [
+  { chave: 'proximas', label: 'Próximas', status: ['Agendada', 'Confirmada'], periodo: 'proximas' },
+  { chave: 'anteriores', label: 'Anteriores', status: ['Realizada', 'Cancelada'], periodo: 'anteriores' },
   { chave: 'todas', label: 'Todas' },
 ]
 
@@ -37,10 +42,20 @@ export function MinhasSessoesView() {
 
   const { itens, total, carregando, carregandoMais, erro, vazio, temMais, carregarMais, recarregar } =
     useListaPaginada<SessaoResumo>(
-      (page) =>
-        m04.GET('/usuaria/sessoes', {
-          params: { query: { status: filtro.status, page, size: 20 } },
-        }),
+      (page) => {
+        const agora = new Date().toISOString()
+        return m04.GET('/usuaria/sessoes', {
+          params: {
+            query: {
+              status: filtro.status,
+              de: filtro.periodo === 'proximas' ? agora : undefined,
+              ate: filtro.periodo === 'anteriores' ? agora : undefined,
+              page,
+              size: 20,
+            },
+          },
+        })
+      },
       [filtro.chave],
     )
 
@@ -98,7 +113,9 @@ export function MinhasSessoesView() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-[17px] leading-tight text-plum">{nomeDoTipo(s)}</h3>
+                    <h3 className="font-display text-[17px] leading-tight text-plum">
+                      {s.tituloGrupo ?? nomeDoTipo(s)}
+                    </h3>
                     <span
                       className={cn(
                         'rounded-pill px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider',
@@ -107,6 +124,11 @@ export function MinhasSessoesView() {
                     >
                       {STATUS_LABEL[s.status]}
                     </span>
+                    {s.linkMeetStatus === 'Falhou' && (
+                      <span className="rounded-pill bg-red-alert/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-red-alert">
+                        Sala com problema
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-[13.5px] capitalize text-plum/60">
                     {diaPorExtenso(s.dataHora)} · {hora(s.dataHora)}

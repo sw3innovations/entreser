@@ -278,6 +278,7 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
           sessao={dados}
           onFechar={() => setCancelando(false)}
           onCancelada={() => {
+            // PF7 — profissional cancela sem cobrança; `cobrancaAplicada` só se aplica à usuária.
             setCancelando(false)
             showToast('Sessão cancelada.', 'success')
             recarregar()

@@ -13,11 +13,25 @@ import { STATUS_LABEL, STATUS_TOM } from '@/features/m04/lib/sessao'
 import type { components } from '@/features/m04/api/schema'
 
 type SessaoResumo = components['schemas']['SessaoResumo']
+type StatusSessao = components['schemas']['StatusSessao']
 
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
 
 /** Filtro de pendência — sempre resolvido NO SERVIDOR (D15). */
 type Pendencia = 'todas' | 'registro' | 'sala'
+
+/**
+ * Filtro de status — seleção única de "chip", igual ao padrão já usado em
+ * `usuaria/minhas-sessoes-view.tsx`. "Agendadas" cobre `Agendada` e `Confirmada` (D8: o
+ * mesmo estado visual).
+ */
+const FILTROS_STATUS: { chave: string; label: string; status?: StatusSessao[] }[] = [
+  { chave: 'todos', label: 'Todos os status' },
+  { chave: 'agendadas', label: 'Agendadas', status: ['Agendada', 'Confirmada'] },
+  { chave: 'realizadas', label: 'Realizadas', status: ['Realizada'] },
+  { chave: 'canceladas', label: 'Canceladas', status: ['Cancelada'] },
+  { chave: 'nao-compareceu', label: 'Não compareceu', status: ['NaoCompareceu'] },
+]
 
 /**
  * Janela default da agenda (D23): 14 dias atrás até 30 à frente. As sessões que aguardam
@@ -51,6 +65,8 @@ function porDia(itens: SessaoResumo[]) {
  */
 export function AgendaView() {
   const [pendencia, setPendencia] = useState<Pendencia>('todas')
+  const [filtroStatus, setFiltroStatus] = useState(FILTROS_STATUS[0])
+  const [filtroTipo, setFiltroTipo] = useState<SessaoResumo['tipo'] | 'todos'>('todos')
   const [pagina, setPagina] = useState(0)
   const [acumulado, setAcumulado] = useState<SessaoResumo[]>([])
 
@@ -71,10 +87,12 @@ export function AgendaView() {
             size: 20,
             ...(pendencia === 'registro' ? { pendenteRegistro: true } : {}),
             ...(pendencia === 'sala' ? { linkMeetStatus: ['Falhou' as const] } : {}),
+            ...(filtroStatus.status ? { status: filtroStatus.status } : {}),
+            ...(filtroTipo !== 'todos' ? { tipo: [filtroTipo] } : {}),
           },
         },
       }),
-    [pendencia, pagina],
+    [pendencia, filtroStatus.chave, filtroTipo, pagina],
   )
 
   // Página 0 substitui; as seguintes acumulam (mesma ideia do "Ver mais" das listas).
@@ -85,6 +103,18 @@ export function AgendaView() {
 
   const trocarFiltro = (p: Pendencia) => {
     setPendencia(p)
+    setPagina(0)
+    setAcumulado([])
+  }
+
+  const trocarStatus = (f: (typeof FILTROS_STATUS)[number]) => {
+    setFiltroStatus(f)
+    setPagina(0)
+    setAcumulado([])
+  }
+
+  const trocarTipo = (tipo: SessaoResumo['tipo'] | 'todos') => {
+    setFiltroTipo(tipo)
     setPagina(0)
     setAcumulado([])
   }
@@ -143,6 +173,39 @@ export function AgendaView() {
         </button>
       )}
 
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {FILTROS_STATUS.map((f) => (
+            <button
+              key={f.chave}
+              type="button"
+              onClick={() => trocarStatus(f)}
+              className={cn(
+                'rounded-pill border px-4 py-2 text-[13px] font-medium transition-colors',
+                f.chave === filtroStatus.chave
+                  ? 'border-mauve bg-mauve text-white'
+                  : 'border-plum/12 bg-white text-plum/70 hover:border-plum/25',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={filtroTipo}
+          onChange={(e) => trocarTipo(e.target.value as SessaoResumo['tipo'] | 'todos')}
+          className="rounded-pill border border-plum/12 bg-white px-4 py-2 text-[13px] font-medium text-plum/70 transition-colors hover:border-plum/25 focus:outline-none focus:ring-1 focus:ring-mauve/40"
+        >
+          <option value="todos">Todos os tipos</option>
+          {catalogo?.tipos.map((t) => (
+            <option key={t.codigo} value={t.codigo}>
+              {t.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <Estado
         carregando={carregando && pagina === 0}
         erro={erro}
@@ -186,11 +249,11 @@ export function AgendaView() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-display text-[16.5px] leading-tight text-plum">
-                          {/* Grupo mostra o tema; individual mostra o TIPO. Nunca
-                              `profissional.nome`: no painel dela, seria o nome dela mesma.
-                              O nome da usuária não está em `SessaoResumo` — para exibi-lo
-                              o contrato precisaria carregar a participante no resumo. */}
-                          {s.tituloGrupo ?? nomeDoTipo(s.tipo)}
+                          {/* Grupo mostra o tema; individual mostra o nome da participante
+                              (`participanteNome`, preenchido pelo backend só nesta agenda).
+                              Nunca `profissional.nome` — no painel dela, seria o nome dela
+                              mesma. Fallback no tipo caso o nome não venha. */}
+                          {s.tituloGrupo ?? s.participanteNome ?? nomeDoTipo(s.tipo)}
                         </h3>
                         <span
                           className={cn(

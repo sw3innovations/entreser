@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
+import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
@@ -30,6 +31,8 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
     () => m04.GET('/profissionais/{profissionalId}', { params: { path: { profissionalId } } }),
     [profissionalId],
   )
+  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const nomeDoTipo = (codigo: TipoSessao) => catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
   const valor = dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipo)?.valor ?? null
 
@@ -73,6 +76,31 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
                 <div>
                   <p className="text-eyebrow mb-2 text-mauve">Sobre</p>
                   <p className="whitespace-pre-line text-[14.5px] leading-relaxed text-plum/70">{dados.bio}</p>
+                </div>
+              )}
+
+              {dados.tiposOferecidos && dados.tiposOferecidos.length > 0 && (
+                <div>
+                  <p className="text-eyebrow mb-2 text-mauve">Tipos de sessão oferecidos</p>
+                  <div className="flex flex-col gap-2">
+                    {dados.tiposOferecidos
+                      .filter((oferta): oferta is typeof oferta & { valor: number } => oferta.valor != null)
+                      .map((oferta) => {
+                        const selecionado = oferta.tipoSessao === tipo
+                        return (
+                          <div
+                            key={oferta.tipoSessao}
+                            className={cn(
+                              'rounded-card border p-4 shadow-card',
+                              selecionado ? 'border-mauve/40 bg-mauve-ghost' : 'border-plum/8 bg-white',
+                            )}
+                          >
+                            <p className="text-[14.5px] font-medium text-plum">{nomeDoTipo(oferta.tipoSessao)}</p>
+                            <p className="mt-0.5 text-[13px] text-plum/60">{reais(oferta.valor)} por sessão</p>
+                          </div>
+                        )
+                      })}
+                  </div>
                 </div>
               )}
             </div>

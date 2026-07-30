@@ -6,6 +6,7 @@ import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { dataHoraPorExtenso, faixaHoraria, hora, reais } from '@/features/m04/lib/datas'
@@ -34,10 +35,33 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
   const router = useRouter()
   const voltar = useVoltar('/sessoes')
   const [cancelando, setCancelando] = useState(false)
+  const [cancelandoConvite, setCancelandoConvite] = useState(false)
+  const [erroConvite, setErroConvite] = useState<string | null>(null)
+  const [avisoCobranca, setAvisoCobranca] = useState(false)
   const { dados, carregando, erro, recarregar } = useRecurso<Sessao>(
     () => m04.GET('/sessoes/{sessaoId}', { params: { path: { sessaoId } } }),
     [sessaoId],
   )
+
+  const cancelarConvite = async () => {
+    if (cancelandoConvite) return
+    setCancelandoConvite(true)
+    setErroConvite(null)
+    try {
+      const { error } = await m04.DELETE('/sessoes/{sessaoId}/convite', {
+        params: { path: { sessaoId } },
+      })
+      if (error) {
+        setErroConvite(mensagemDe((error as { code?: string }).code))
+        return
+      }
+      recarregar()
+    } catch {
+      setErroConvite(mensagemDe())
+    } finally {
+      setCancelandoConvite(false)
+    }
+  }
   // Nome e categoria do tipo vêm do catálogo (nunca escritos na tela).
   const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
   const tipoInfo = dados ? catalogo?.tipos.find((t) => t.codigo === dados.tipo) : undefined
@@ -63,6 +87,12 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
         <Estado carregando={carregando} erro={erro} vazio={!dados} aoRepetir={recarregar}>
           {dados && (
             <div className="flex flex-col gap-5">
+              {avisoCobranca && (
+                <p className="rounded-card border border-plum/8 bg-white p-4 text-[13.5px] text-plum/60 shadow-card">
+                  Cancelamento com custo, conforme informado.
+                </p>
+              )}
+
               {/* Situação + dados da sessão */}
               <div className="rounded-card border border-plum/8 bg-white p-5 shadow-card">
                 <span
@@ -79,8 +109,32 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
                   {reais(dados.valorPraticado) && (
                     <Linha rotulo="Valor" valor={reais(dados.valorPraticado)!} />
                   )}
+                  {ehGrupo && dados.vagas != null && dados.vagasDisponiveis != null && (
+                    <Linha rotulo="Vagas" valor={`${dados.vagasDisponiveis} de ${dados.vagas} restantes`} />
+                  )}
                 </dl>
               </div>
+
+              {/* Convite de casal pendente (U10) — a única operação do contrato que
+                  cancela um convite ainda não aceito. */}
+              {dados.convitePendente && dados.convitePendente.status === 'Pendente' && (
+                <div className="rounded-card border border-plum/8 bg-white p-4 shadow-card">
+                  <p className="text-[13.5px] text-plum/70">
+                    Convite enviado para {dados.convitePendente.emailMascarado}, aguardando aceite.
+                  </p>
+                  {erroConvite && (
+                    <p className="mt-2 text-[13px] font-medium text-red-alert">{erroConvite}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={cancelarConvite}
+                    disabled={cancelandoConvite}
+                    className="mt-3 h-[42px] rounded-full border border-mauve/30 bg-white px-4 text-[13.5px] font-semibold text-mauve transition-es disabled:opacity-60"
+                  >
+                    {cancelandoConvite ? 'Cancelando…' : 'Cancelar convite'}
+                  </button>
+                </div>
+              )}
 
               {/* Sala — o backend decide a visibilidade do link (D14); a tela só exibe. */}
               {dados.linkMeetStatus === 'Disponivel' && dados.linkMeet && (
@@ -154,8 +208,9 @@ export function SessaoDetalheView({ sessaoId }: { sessaoId: string }) {
           sessao={dados}
           acao={ehGrupo ? 'sairDoGrupo' : 'cancelarSessao'}
           onFechar={() => setCancelando(false)}
-          onCancelada={() => {
+          onCancelada={(_s, cobrancaAplicada) => {
             setCancelando(false)
+            setAvisoCobranca(cobrancaAplicada)
             recarregar()
           }}
         />

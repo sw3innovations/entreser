@@ -10,8 +10,8 @@ type Sessao = components['schemas']['Sessao']
 interface Props {
   sessao: Sessao
   onFechar: () => void
-  /** Recebe a sessão já cancelada (o backend devolve o agregado atualizado). */
-  onCancelada: (s: Sessao) => void
+  /** Recebe a sessão já cancelada (o backend devolve o agregado atualizado) e se houve cobrança. */
+  onCancelada: (s: Sessao, cobrancaAplicada: boolean) => void
   /**
    * Quem está cancelando. Muda só o texto: a usuária pode ter cobrança quando faltam
    * menos de 24h; a profissional cancela a qualquer momento, sem penalidade (PF7). O
@@ -70,7 +70,7 @@ export function CancelarDialog({
         setErro(mensagemDe((error as { code?: string }).code))
         return
       }
-      if (data) onCancelada(data.sessao)
+      if (data) onCancelada(data.sessao, data.cobrancaAplicada)
     } catch {
       setErro(mensagemDe())
     } finally {
