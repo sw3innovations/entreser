@@ -49,6 +49,11 @@ export const MENSAGENS: Record<string, string> = {
   NAO_AUTENTICADO: 'Sua sessão expirou. Entre novamente.',
   NAO_AUTORIZADO: 'Você não tem permissão para isso.',
   RECURSO_NAO_ENCONTRADO: 'Não encontramos o que você procura.',
+
+  // Fallbacks do backend fora do contrato (GlobalExceptionHandler) — não estão no
+  // openapi.yaml, mas o servidor pode emiti-los; sem tradução cairiam no FALLBACK genérico.
+  CONFLITO_DADOS: 'Esta ação conflita com algo que já existe. Atualize a tela e tente de novo.',
+  ERRO_INTERNO: 'Tivemos um problema inesperado. Tente novamente em instantes.',
 }
 
 export const FALLBACK = 'Não conseguimos completar essa ação. Tente novamente.'

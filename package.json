@@ -10,7 +10,8 @@
     "gen:api": "openapi-typescript src/features/m04/contract/openapi.yaml -o src/features/m04/api/schema.ts",
     "predev": "npm run gen:api",
     "prebuild": "npm run gen:api",
-    "m04:check-erros": "node scripts/m04-check-erros.mjs"
+    "m04:check-erros": "node scripts/m04-check-erros.mjs",
+    "m04:check-drift": "python3 scripts/m04-check-drift.py"
   },
   "dependencies": {
     "@heroui/react": "^3.2.1",
