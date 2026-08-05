@@ -19,6 +19,13 @@ type Participante = components['schemas']['Participante']
 
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
 
+/** "28 de julho, 21:14" — usado só na linha do tempo (data curta, sem dia da semana). */
+function dataHoraCurta(iso: string): string {
+  const d = new Date(iso)
+  const data = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+  return `${data}, ${hora(iso)}`
+}
+
 /**
  * P2 · Detalhe da sessão (lado da profissional). Tudo o que aparece é campo pronto:
  * `pendenteRegistro` habilita o registro, `podeCancelar` o cancelamento, `linkMeetStatus`
@@ -95,21 +102,43 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
                     {STATUS_LABEL[dados.status]}
                   </span>
                   {dados.pendenteRegistro && (
-                    <span className="rounded-pill bg-mauve/12 px-3 py-1 text-[11.5px] font-semibold uppercase tracking-wider text-mauve">
+                    <span className="rounded-pill bg-cream-mid px-3 py-1 text-[11.5px] font-semibold uppercase tracking-wider text-plum">
                       Aguardando registro
                     </span>
                   )}
                 </div>
-                <dl className="mt-4 flex flex-col gap-3">
-                  <Linha rotulo="Horário" valor={faixaHoraria(dados.dataHora, dados.dataHoraFim)} />
-                  <Linha rotulo="Duração" valor={`${dados.duracaoMinutos} minutos`} />
+                <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-2xl bg-plum/7">
+                  <MetricaMini rotulo="Horário" valor={faixaHoraria(dados.dataHora, dados.dataHoraFim)} />
+                  <MetricaMini rotulo="Duração" valor={`${dados.duracaoMinutos} minutos`} />
                   {reais(dados.valorPraticado) && (
-                    <Linha
-                      rotulo="Valor"
-                      valor={`${reais(dados.valorPraticado)}${ehGrupo ? ' por participante' : ''}`}
-                    />
+                    <MetricaMini rotulo="Valor" valor={`${reais(dados.valorPraticado)}${ehGrupo ? '/pessoa' : ''}`} />
                   )}
-                </dl>
+                </div>
+              </section>
+
+              {/* Linha do tempo — só eventos reais (criadaEm sempre; canceladaEm quando houver).
+                  Nada de "sala criada"/"lembrete enviado": não existe campo por trás disso. */}
+              <section className={CARD}>
+                <h2 className="mb-5 font-display text-lg text-plum">Linha do tempo</h2>
+                <div className="flex flex-col">
+                  {[
+                    { titulo: 'Sessão marcada', quando: dados.criadaEm, cor: 'var(--color-mauve)' },
+                    ...(dados.status === 'Cancelada' && dados.canceladaEm
+                      ? [{ titulo: 'Sessão cancelada', quando: dados.canceladaEm, cor: 'var(--color-red-alert)' }]
+                      : []),
+                  ].map((t, i, arr) => (
+                    <div key={t.titulo} className="flex gap-[18px]">
+                      <span className="flex shrink-0 flex-col items-center">
+                        <span className="mt-[5px] h-[11px] w-[11px] rounded-pill" style={{ background: t.cor }} />
+                        {i < arr.length - 1 && <span className="w-px flex-1 bg-plum/10" />}
+                      </span>
+                      <div className={i < arr.length - 1 ? 'pb-5' : ''}>
+                        <p className="text-[14.5px] font-medium text-plum">{t.titulo}</p>
+                        <p className="mt-1 text-[12.5px] text-plum/50">{dataHoraCurta(t.quando)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
 
               {/* Participantes — com o histórico de faltas (só a profissional vê). */}
@@ -179,10 +208,12 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
 
               {/* Cancelamento */}
               {dados.status === 'Cancelada' && dados.canceladaPor && (
-                <section className={CARD}>
-                  <p className="text-[13.5px] text-plum/70">{CANCELADA_POR_TEXTO_PROF[dados.canceladaPor]}</p>
+                <section className="rounded-card border border-mauve/[0.16] bg-mauve-ghost p-6">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mauve">
+                    {CANCELADA_POR_TEXTO_PROF[dados.canceladaPor]}
+                  </p>
                   {dados.motivoCancelamento && (
-                    <p className="mt-1.5 text-[13px] italic text-plum/50">“{dados.motivoCancelamento}”</p>
+                    <p className="mt-3 font-display text-lg italic leading-relaxed text-plum">“{dados.motivoCancelamento}”</p>
                   )}
                 </section>
               )}
@@ -253,6 +284,13 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
                   )}
                 </section>
               )}
+
+              <div className="rounded-card border border-plum/6 bg-cream p-5">
+                <p className="text-[13px] leading-relaxed text-plum/62">
+                  Sessões já marcadas guardam o valor da época. Alterar seus valores vale só para as
+                  próximas.
+                </p>
+              </div>
             </aside>
           </div>
         )}
@@ -289,11 +327,11 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
   )
 }
 
-function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+function MetricaMini({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[13px] text-plum/50">{rotulo}</dt>
-      <dd className="text-[14.5px] font-medium text-plum">{valor}</dd>
+    <div className="bg-white p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-plum/40">{rotulo}</p>
+      <p className="mt-2 font-display text-xl leading-none text-plum">{valor}</p>
     </div>
   )
 }

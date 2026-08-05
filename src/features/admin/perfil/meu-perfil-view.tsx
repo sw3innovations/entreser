@@ -191,6 +191,43 @@ export function MeuPerfilView() {
         </ESCard>
 
         <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 pl-1">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-mauve">
+              <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+              <circle cx="12" cy="12" r="2.6" />
+            </svg>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mauve">Como as usuárias veem você</p>
+          </div>
+
+          <div className="rounded-[26px] bg-gradient-to-br from-plum via-plum-mid to-mauve-dark p-[26px] text-cream shadow-[0_22px_48px_rgba(45,24,64,0.3)]">
+            <div className="flex items-center gap-4">
+              {foto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={foto} alt="Foto" className="h-16 w-16 shrink-0 rounded-pill object-cover" />
+              ) : (
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-pill border border-white/[0.18] bg-white/10 font-display text-xl">
+                  {form.nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase()}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="font-display text-2xl font-normal leading-tight">{form.nome || 'Seu nome'}</p>
+                <p className="mt-1 text-[12.5px] text-cream/60">Psicóloga · CRP {form.crp || '—'}</p>
+              </div>
+            </div>
+
+            {form.abordagem.trim() && (
+              <div className="mt-5 flex flex-wrap gap-1.5">
+                {form.abordagem.split(',').map((a) => a.trim()).filter(Boolean).map((a) => (
+                  <span key={a} className="rounded-pill border border-white/[0.14] bg-white/10 px-3 py-1.5 text-[11.5px]">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {form.bio.trim() && <p className="mt-5 text-[13.5px] leading-relaxed text-cream/[0.82]">{form.bio}</p>}
+          </div>
+
           <ESCard variant="solid" isHoverable={false}>
             <div className="p-5">
               <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-mauve">Status</div>

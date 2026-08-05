@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ESButton, MoneyInput, PageHeader, formatCentavos, useToast } from '@/components/ui'
+import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -96,6 +97,13 @@ export function ValoresView() {
 
   const definidos = tipos.filter((t) => valorDe(t.codigo) != null).length
 
+  // Cartão de exemplo para tipos de grupo — o primeiro tipo de grupo com valor definido,
+  // usando os limites reais do catálogo (nunca um número de exemplo fixo).
+  const tipoGrupoComValor = tipos.find((t) => t.categoria === 'Grupo' && valorDe(t.codigo) != null)
+  const exemploGrupo = tipoGrupoComValor
+    ? { nome: tipoGrupoComValor.nome, max: tipoGrupoComValor.maxParticipantes, valor: valorDe(tipoGrupoComValor.codigo)! }
+    : null
+
   return (
     <div>
       <PageHeader
@@ -105,29 +113,33 @@ export function ValoresView() {
 
       <Estado carregando={carregando} erro={erroCarga} aoRepetir={recarregar}>
         <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
             {tipos.map((t) => {
               const valor = valorDe(t.codigo)
               const ehGrupo = t.categoria === 'Grupo'
               const invalido = invalidos.some((i) => i.codigo === t.codigo)
+              const publicado = valor != null
               return (
-                <section key={t.codigo} className={CARD}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
+                <section key={t.codigo} className={cn(CARD, 'flex flex-col')}>
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
                       <h3 className="font-display text-lg leading-tight text-plum">{t.nome}</h3>
                       <p className="mt-0.5 text-xs text-plum/45">
                         {t.duracaoMinutos} minutos
                         {ehGrupo && ` · ${t.minParticipantes} a ${t.maxParticipantes} participantes`}
                       </p>
                     </div>
-                    {valor == null && (
-                      <span className="rounded-pill bg-plum/6 px-2.5 py-1 text-[11px] font-medium text-plum/50">
-                        Não aparece para as usuárias
-                      </span>
-                    )}
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-pill px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wider',
+                        publicado ? 'bg-success-light text-success-dark' : 'bg-plum-soft text-plum/50',
+                      )}
+                    >
+                      {publicado ? 'Publicado' : 'Não ofereço'}
+                    </span>
                   </div>
 
-                  <div className="mt-3.5 max-w-[280px]">
+                  <div className="mt-4">
                     <MoneyInput
                       label={ehGrupo ? 'Valor por participante' : 'Valor da sessão'}
                       value={valor}
@@ -136,7 +148,9 @@ export function ValoresView() {
                       hint={
                         ehGrupo && valor != null && valor > 0
                           ? `Até ${formatCentavos(Math.round(valor * t.maxParticipantes * 100))} com ${t.maxParticipantes} inscritas.`
-                          : undefined
+                          : !publicado
+                            ? 'Não aparece para as usuárias.'
+                            : undefined
                       }
                     />
                   </div>
@@ -147,18 +161,34 @@ export function ValoresView() {
 
           <aside className="flex w-full flex-col gap-4 lg:w-[300px] lg:shrink-0">
             <section className={CARD}>
-              <h3 className="font-display text-base text-plum">O passado não muda</h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-plum/55">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mauve">Resumo</p>
+              <p className="mt-2.5 font-display text-[26px] leading-tight text-plum">
+                {definidos} de {tipos.length}
+              </p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-plum/60">
+                tipos com valor definido. Tipos sem valor não aparecem para as usuárias no seu perfil.
+              </p>
+            </section>
+            <section className={CARD}>
+              <h3 className="font-display text-lg text-plum">O passado não muda</h3>
+              <p className="mt-2 text-[13px] leading-relaxed text-plum/58">
                 Sessões já marcadas guardam o valor da época. Alterar aqui vale só para as
                 próximas marcações.
               </p>
             </section>
-            <section className={CARD}>
-              <h3 className="font-display text-base text-plum">Resumo</h3>
-              <p className="mt-1.5 text-[13px] text-plum/55">
-                {definidos} de {tipos.length} tipos com valor definido.
-              </p>
-            </section>
+            {exemploGrupo && (
+              <section className="rounded-card border border-mauve/[0.14] bg-mauve-ghost p-[26px]">
+                <h3 className="font-display text-lg text-plum">{exemploGrupo.nome}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-plum/62">
+                  O valor é por participante. Com {exemploGrupo.max} inscritas, uma sessão de{' '}
+                  {formatCentavos(Math.round(exemploGrupo.valor * 100))} chega a{' '}
+                  <strong className="font-semibold text-plum">
+                    {formatCentavos(Math.round(exemploGrupo.valor * exemploGrupo.max * 100))}
+                  </strong>
+                  .
+                </p>
+              </section>
+            )}
           </aside>
         </div>
 

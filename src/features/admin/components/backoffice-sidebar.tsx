@@ -1,5 +1,10 @@
+'use client'
+
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { m04 } from '@/features/m04/api/client'
+import { useRecurso } from '@/features/m04/api/use-recurso'
+import { inicioDaSemanaISO, fimDaSemanaISO, inicioDoDiaUTC, fimDoDiaUTC } from '@/features/m04/lib/datas'
 import { getNavGroups, type BackofficeProfile, type NavItem } from './backoffice-nav'
 
 interface BackofficeSidebarProps {
@@ -15,6 +20,26 @@ interface BackofficeSidebarProps {
  */
 export function BackofficeSidebar({ profile, activeKey, collapsed }: BackofficeSidebarProps) {
   const groups = getNavGroups(profile)
+
+  // "Sua semana" — só para a Profissional; um único GET leve (size=1, só os totais do
+  // envelope) para não pagar o custo de uma listagem completa numa sidebar persistente.
+  const { dados: semana } = useRecurso(
+    () =>
+      profile === 'prof'
+        ? m04.GET('/profissional/agenda', {
+            params: {
+              query: {
+                de: inicioDoDiaUTC(inicioDaSemanaISO()),
+                ate: fimDoDiaUTC(fimDaSemanaISO()),
+                page: 0,
+                size: 1,
+              },
+            },
+          })
+        : Promise.resolve({ data: undefined, response: new Response(null, { status: 204 }) }),
+    [profile],
+  )
+
   return (
     <aside
       className="sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-plum/8 bg-white transition-[width] duration-200 ease-[cubic-bezier(0,0,0.2,1)]"
@@ -53,6 +78,20 @@ export function BackofficeSidebar({ profile, activeKey, collapsed }: BackofficeS
           </div>
         ))}
       </nav>
+
+      {profile === 'prof' && !collapsed && semana && (
+        <div className="mx-3.5 mb-3.5 shrink-0 rounded-2xl border border-mauve/[0.12] bg-mauve-ghost p-4">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mauve">Sua semana</p>
+          <p className="mt-1.5 font-display text-2xl leading-none text-plum">
+            {semana.totalElements} {semana.totalElements === 1 ? 'sessão' : 'sessões'}
+          </p>
+          {semana.totalPendenteRegistro > 0 && (
+            <p className="mt-1.5 text-[12px] leading-snug text-plum/58">
+              {semana.totalPendenteRegistro} {semana.totalPendenteRegistro === 1 ? 'ainda aguarda' : 'ainda aguardam'} registro.
+            </p>
+          )}
+        </div>
+      )}
     </aside>
   )
 }
