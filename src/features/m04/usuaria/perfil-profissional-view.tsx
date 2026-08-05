@@ -1,12 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features/usuaria/ui'
+import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon, CheckIcon, CreditCardIcon } from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
+import { iconeDoTipo } from '@/features/m04/lib/tipo-icone'
 import type { components } from '@/features/m04/api/schema'
 
 type Detalhe = components['schemas']['ProfissionalDetalhe']
@@ -21,12 +23,16 @@ function reais(valor: number): string {
 
 /**
  * U3 · Perfil da profissional. Carrega `GET /profissionais/{id}` (ProfissionalDetalhe).
- * Segue com o tipo escolhido na U1/U2 (`tipo` da rota); o valor vem de `tiposOferecidos`
- * (por tipo), sem recálculo. CTA leva aos horários (U4).
+ * Chega com o tipo escolhido na U1/U2 (`tipo` da rota), mas a pessoa pode trocar aqui —
+ * troca é só estado local (`tipoSelecionado`): já temos o preço de TODOS os tipos em
+ * `tiposOferecidos`, então mudar a seleção não precisa de navegação nem novo fetch (evita
+ * o "piscar" de recarregar a tela inteira ao só trocar qual tipo está marcado). A URL só
+ * muda de fato quando a pessoa avança para os horários (U4), com o tipo já resolvido.
  */
 export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSessao; profissionalId: string }) {
   const router = useRouter()
   const voltar = useVoltar('/agendar')
+  const [tipoSelecionado, setTipoSelecionado] = useState<TipoSessao>(tipo)
   const { dados, carregando, erro, recarregar } = useRecurso<Detalhe>(
     () => m04.GET('/profissionais/{profissionalId}', { params: { path: { profissionalId } } }),
     [profissionalId],
@@ -34,7 +40,7 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
   const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
   const nomeDoTipo = (codigo: TipoSessao) => catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
-  const valor = dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipo)?.valor ?? null
+  const valor = dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipoSelecionado)?.valor ?? null
 
   const topBar = (
     <HeroIconButton aria-label="Voltar" onPress={voltar}>
@@ -55,49 +61,71 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
         <Estado carregando={carregando} erro={erro} vazio={!dados} aoRepetir={recarregar}>
           {dados && (
             <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-4 rounded-card border border-plum/8 bg-white p-4 shadow-card">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-mauve-ghost">
-                  {dados.foto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={dados.foto} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="font-display text-xl text-mauve">{iniciais(dados.nome)}</span>
-                  )}
+              <div className="rounded-card border border-plum/8 bg-white p-[18px] shadow-card">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-mauve to-plum-mid shadow-[0_6px_16px_rgba(122,74,92,0.28)]">
+                    {dados.foto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={dados.foto} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="font-display text-xl text-cream">{iniciais(dados.nome)}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="rounded-pill border border-mauve/[0.14] bg-mauve-ghost px-2.5 py-1 text-[11.5px] font-medium text-mauve">
+                        CRP {dados.crp}
+                      </span>
+                      {dados.abordagem && (
+                        <span className="rounded-pill bg-plum/[0.04] px-2.5 py-1 text-[11.5px] text-plum/55">
+                          {dados.abordagem}
+                        </span>
+                      )}
+                    </div>
+                    {valor != null && (
+                      <p className="mt-2 flex items-center gap-1.5 text-[14px] font-semibold text-plum">
+                        <CreditCardIcon size={14} className="text-plum/40" />
+                        {reais(valor)} <span className="font-normal text-plum/45">por sessão</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] text-plum/55">CRP {dados.crp}</p>
-                  {valor != null && (
-                    <p className="mt-0.5 text-sm font-medium text-mauve">{reais(valor)} por sessão</p>
-                  )}
-                </div>
+                {dados.bio && (
+                  <p className="mt-3.5 whitespace-pre-line border-t border-plum/8 pt-3.5 text-[13.5px] leading-relaxed text-plum/62">
+                    {dados.bio}
+                  </p>
+                )}
               </div>
-
-              {dados.bio && (
-                <div>
-                  <p className="text-eyebrow mb-2 text-mauve">Sobre</p>
-                  <p className="whitespace-pre-line text-[14.5px] leading-relaxed text-plum/70">{dados.bio}</p>
-                </div>
-              )}
 
               {dados.tiposOferecidos && dados.tiposOferecidos.length > 0 && (
                 <div>
-                  <p className="text-eyebrow mb-2 text-mauve">Tipos de sessão oferecidos</p>
-                  <div className="flex flex-col gap-2">
+                  <p className="text-eyebrow mb-2.5 text-mauve">Tipos de sessão oferecidos</p>
+                  <p className="mb-2.5 -mt-1.5 text-[12px] text-plum/45">Toque para trocar o tipo de sessão.</p>
+                  <div className="flex flex-col gap-2.5">
                     {dados.tiposOferecidos
                       .filter((oferta): oferta is typeof oferta & { valor: number } => oferta.valor != null)
                       .map((oferta) => {
-                        const selecionado = oferta.tipoSessao === tipo
+                        const selecionado = oferta.tipoSessao === tipoSelecionado
+                        const Icone = iconeDoTipo(oferta.tipoSessao)
                         return (
-                          <div
+                          <button
                             key={oferta.tipoSessao}
+                            type="button"
+                            onClick={() => setTipoSelecionado(oferta.tipoSessao)}
                             className={cn(
-                              'rounded-card border p-4 shadow-card',
-                              selecionado ? 'border-mauve/40 bg-mauve-ghost' : 'border-plum/8 bg-white',
+                              'flex items-center gap-3 rounded-2xl border p-3.5 text-left shadow-card transition-es active:scale-[0.99]',
+                              selecionado
+                                ? 'border-mauve/40 bg-mauve-ghost'
+                                : 'border-plum/8 bg-white hover:border-mauve/25 hover:shadow-card-hover',
                             )}
                           >
-                            <p className="text-[14.5px] font-medium text-plum">{nomeDoTipo(oferta.tipoSessao)}</p>
-                            <p className="mt-0.5 text-[13px] text-plum/60">{reais(oferta.valor)} por sessão</p>
-                          </div>
+                            <Icone size={18} className="shrink-0 text-mauve" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[14.5px] font-medium text-plum">{nomeDoTipo(oferta.tipoSessao)}</p>
+                              <p className="mt-0.5 text-[12.5px] text-plum/55">{reais(oferta.valor)} por sessão</p>
+                            </div>
+                            {selecionado && <CheckIcon size={18} className="shrink-0 text-mauve" />}
+                          </button>
                         )
                       })}
                   </div>
@@ -114,7 +142,7 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
           <div className="mx-auto flex w-full max-w-3xl px-[18px] pb-[18px] pt-[14px]">
             <button
               type="button"
-              onClick={() => router.push(`/agendar/${tipo}/${profissionalId}/horarios`)}
+              onClick={() => router.push(`/agendar/${tipoSelecionado}/${profissionalId}/horarios`)}
               className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99]"
             >
               Ver horários

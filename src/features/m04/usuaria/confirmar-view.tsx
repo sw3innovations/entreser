@@ -1,14 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon } from '@/features/usuaria/ui'
+import {
+  PageHero,
+  PageContent,
+  HeroIconButton,
+  ArrowLeftIcon,
+  UserIcon,
+  ClockIcon,
+  CreditCardIcon,
+  ShieldCheckIcon,
+  CheckIcon,
+} from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
-import { dataHoraPorExtenso, faixaHoraria } from '@/features/m04/lib/datas'
+import { dataHoraPorExtenso, hora } from '@/features/m04/lib/datas'
+import { iconeDoTipo } from '@/features/m04/lib/tipo-icone'
 import type { components } from '@/features/m04/api/schema'
+
+/** "TER" / "11" / "AGO" — bloco de data em estilo cartão, ao lado da hora em destaque. */
+function blocoData(iso: string) {
+  const d = new Date(iso)
+  const dia = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
+  const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
+  return { dia, numero: d.getDate(), mes }
+}
 
 type TipoSessao = components['schemas']['TipoSessao']
 type ProfissionalDetalhe = components['schemas']['ProfissionalDetalhe']
@@ -101,24 +120,40 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
       />
       <PageContent width="md" className="pt-6">
         <div className="rounded-card border border-plum/8 bg-white p-5 shadow-card">
-          <dl className="flex flex-col gap-3.5">
-            <div>
-              <dt className="text-eyebrow text-mauve">Quando</dt>
-              <dd className="mt-1 font-display text-lg capitalize leading-snug text-plum">
-                {dataHoraPorExtenso(inicio)}
-              </dd>
-              <dd className="mt-0.5 text-[13px] text-plum/50">{faixaHoraria(inicio, fim)}</dd>
+          <div className="mb-1 flex items-center gap-1.5 text-eyebrow text-mauve">
+            <ClockIcon size={13} /> Quando
+          </div>
+          <div className="mb-4 mt-2.5 flex items-center gap-3.5">
+            <div className="flex w-[58px] shrink-0 flex-col items-center rounded-2xl bg-gradient-to-br from-plum to-plum-mid py-2.5 text-center shadow-[0_8px_20px_rgba(45,24,64,0.28)]">
+              <span className="text-[9.5px] font-bold tracking-wider text-cream/70">{blocoData(inicio).dia}</span>
+              <span className="font-display text-2xl leading-tight text-cream">{blocoData(inicio).numero}</span>
+              <span className="text-[9.5px] font-semibold tracking-wider text-cream/60">{blocoData(inicio).mes}</span>
             </div>
-            {profissional && <Linha rotulo="Com" valor={profissional.nome} />}
-            {tipoInfo && <Linha rotulo="Tipo" valor={tipoInfo.nome} />}
-            {tipoInfo && <Linha rotulo="Duração" valor={`${tipoInfo.duracaoMinutos} minutos`} />}
-            {valor != null && <Linha rotulo="Valor" valor={reais(valor)} />}
+            <div className="min-w-0">
+              <h3 className="font-display text-2xl leading-none text-plum">{hora(inicio)}</h3>
+              <p className="mt-1.5 text-[13px] capitalize text-plum/50">{dataHoraPorExtenso(inicio)}</p>
+              <p className="mt-0.5 text-[13px] text-plum/50">termina às {hora(fim)}</p>
+            </div>
+          </div>
+
+          <dl className="flex flex-col gap-2.5 border-t border-plum/8 pt-3.5">
+            {profissional && <Linha icone={<UserIcon size={14} />} rotulo="Com" valor={profissional.nome} />}
+            {tipoInfo && <Linha icone={iconeDeTipoElemento(tipo, 14)} rotulo="Tipo" valor={tipoInfo.nome} />}
+            {tipoInfo && (
+              <Linha icone={<ClockIcon size={14} />} rotulo="Duração" valor={`${tipoInfo.duracaoMinutos} minutos`} />
+            )}
+            {valor != null && (
+              <Linha icone={<CreditCardIcon size={14} />} rotulo="Valor" valor={reais(valor)} />
+            )}
           </dl>
         </div>
 
-        <p className="mt-4 rounded-input border border-plum/8 bg-white px-4 py-3 text-[13px] leading-relaxed text-plum/60">
-          Você pode cancelar ou reagendar até 24 horas antes, sem custo.
-        </p>
+        <div className="mt-4 flex items-start gap-2.5 rounded-input border border-plum/8 bg-white px-4 py-3.5">
+          <ShieldCheckIcon size={16} className="mt-0.5 shrink-0 text-mauve" />
+          <p className="text-[13px] leading-relaxed text-plum/60">
+            Você pode cancelar ou reagendar até 24 horas antes, sem custo.
+          </p>
+        </div>
 
         {/* U6 · casal: convidar a parceira é opcional e não segura a sessão (D4). */}
         {ehCasal && (
@@ -162,13 +197,20 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
       </PageContent>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-plum/[0.06] bg-[rgba(255,253,250,0.9)] shadow-[0_-6px_24px_rgba(45,24,64,0.08)] backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-3xl px-[18px] pb-[18px] pt-[14px]">
+        <div className="mx-auto w-full max-w-3xl px-[18px] pb-[18px] pt-[13px]">
+          {valor != null && (
+            <div className="mb-2.5 flex items-center justify-between">
+              <span className="text-[13px] text-plum/50">Total a pagar</span>
+              <span className="font-display text-xl text-plum">{reais(valor)}</span>
+            </div>
+          )}
           <button
             type="button"
             onClick={confirmar}
             disabled={enviando || slotOcupado || emailInvalido}
-            className="flex h-[50px] flex-1 items-center justify-center rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99] disabled:opacity-60"
+            className="flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99] disabled:opacity-60"
           >
+            {!enviando && <CheckIcon size={17} />}
             {enviando ? 'Marcando…' : 'Confirmar agendamento'}
           </button>
         </div>
@@ -177,11 +219,21 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
   )
 }
 
-function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Linha({ icone, rotulo, valor }: { icone?: ReactNode; rotulo: string; valor: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[13px] text-plum/50">{rotulo}</dt>
+    <div className="flex items-center justify-between gap-4">
+      <dt className="flex items-center gap-2 text-[13px] text-plum/50">
+        {icone && <span className="text-plum/40">{icone}</span>}
+        {rotulo}
+      </dt>
       <dd className="text-[14.5px] font-medium text-plum">{valor}</dd>
     </div>
   )
+}
+
+/** Elemento do ícone do tipo de sessão. Função utilitária (não um componente) — só
+ * escolhe qual ícone já existente desenhar, não "cria" um componente novo por render. */
+function iconeDeTipoElemento(tipo: TipoSessao, size: number) {
+  const Icone = iconeDoTipo(tipo)
+  return <Icone size={size} />
 }
