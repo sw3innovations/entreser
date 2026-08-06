@@ -6,6 +6,7 @@ import { EmptyState, ESButton, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
+import { juntarSemRepetir } from '@/features/m04/api/use-lista-paginada'
 import { Estado } from '@/features/m04/ui/estado'
 import { VerMais } from '@/features/m04/ui/ver-mais'
 import {
@@ -20,6 +21,8 @@ import {
   inicioDoMesUTC,
   fimDoMesUTC,
   reais,
+  HORIZONTE_AGENDAMENTO_DIAS,
+  HORIZONTE_AGENDAMENTO_SEMANAS,
 } from '@/features/m04/lib/datas'
 import { STATUS_LABEL, STATUS_TOM } from '@/features/m04/lib/sessao'
 import type { components } from '@/features/m04/api/schema'
@@ -45,16 +48,48 @@ const FILTROS_STATUS: { chave: string; label: string; status?: StatusSessao[] }[
   { chave: 'nao-compareceu', label: 'Não compareceu', status: ['NaoCompareceu'] },
 ]
 
+/** Quanto passado a agenda alcança — o suficiente para registrar o que ficou pendente. */
+const DIAS_PASSADO = 14
+
 /**
- * Janela default da agenda (D23): 14 dias atrás até 30 à frente. As sessões que aguardam
- * registro estão no PASSADO — uma janela que começasse hoje esconderia justamente as
- * pendências que o painel existe para mostrar.
+ * Período da lista. **Próximas é o default** e isso é a coisa mais importante daqui: com
+ * uma janela única começando 14 dias atrás, as primeiras páginas eram tomadas por sessões
+ * velhas (em boa parte canceladas), e o que está por vir — o motivo de abrir a agenda —
+ * caía na página 2 ou 3. A profissional via o passado e paginava atrás do futuro.
+ *
+ * O limite da frente NÃO é um número solto: é o mesmo `HORIZONTE_AGENDAMENTO_DIAS` que
+ * limita até onde a usuária consegue marcar. Um valor menor aqui esconderia da profissional
+ * sessões que já existem na agenda dela — foi exatamente o que aconteceu quando os dois
+ * lados tinham 30 dias e só um deles mudou.
  */
-function janela() {
-  return { de: `${emDiasISO(-14)}T00:00:00Z`, ate: `${emDiasISO(30)}T23:59:59Z` }
+const FILTROS_PERIODO = [
+  { chave: 'proximas', label: 'Próximas', dePeriodo: 0, atePeriodo: HORIZONTE_AGENDAMENTO_DIAS },
+  { chave: 'anteriores', label: 'Anteriores', dePeriodo: -DIAS_PASSADO, atePeriodo: 0 },
+  { chave: 'todas', label: 'Todo o período', dePeriodo: -DIAS_PASSADO, atePeriodo: HORIZONTE_AGENDAMENTO_DIAS },
+] as const
+
+type ChavePeriodo = (typeof FILTROS_PERIODO)[number]['chave']
+
+function janela(periodo: ChavePeriodo) {
+  const f = FILTROS_PERIODO.find((p) => p.chave === periodo) ?? FILTROS_PERIODO[0]
+  return {
+    de: `${emDiasISO(f.dePeriodo)}T00:00:00Z`,
+    ate: `${emDiasISO(f.atePeriodo)}T23:59:59Z`,
+  }
 }
 
-/** Agrupa por dia no fuso local (a agenda é lida como "o meu dia", não como UTC). */
+/**
+ * Agrupa por dia no fuso local (a agenda é lida como "o meu dia", não como UTC) e ordena
+ * por data — dias entre si e sessões dentro do dia.
+ *
+ * A ordenação é feita AQUI porque `GET /profissional/agenda` não a garante: na prática ele
+ * devolve fora de ordem (observado: 7/ago, depois 11/ago, depois 10/ago). Numa agenda isso
+ * é grave duas vezes — a leitura fica sem sentido, e como a paginação segue a ordem do
+ * servidor, "página 1" deixa de ser "as 20 mais próximas" e vira 20 quaisquer.
+ *
+ * Ordenar no cliente conserta o que está carregado; a ordem entre PÁGINAS continua sendo do
+ * servidor. O ideal é ele ordenar (ver TASKS_BACKEND_M04.md).
+ */
 function porDia(itens: SessaoResumo[]) {
   const mapa = new Map<string, SessaoResumo[]>()
   for (const s of itens) {
@@ -63,7 +98,12 @@ function porDia(itens: SessaoResumo[]) {
     if (atual) atual.push(s)
     else mapa.set(k, [s])
   }
-  return [...mapa.entries()].map(([chave, sessoes]) => ({ chave, sessoes }))
+  return [...mapa.entries()]
+    .map(([chave, sessoes]) => ({
+      chave,
+      sessoes: [...sessoes].sort((a, b) => a.dataHora.localeCompare(b.dataHora)),
+    }))
+    .sort((a, b) => a.chave.localeCompare(b.chave))
 }
 
 /** Cor de destaque por status — usada no risco lateral dos cards e nos blocos da grade semanal. */
@@ -86,9 +126,13 @@ function dataLocalDe(isoLocal: string): Date {
   return new Date(y, m - 1, d)
 }
 
-/** As 7 datas locais (`YYYY-MM-DD`) da semana corrente, segunda a domingo. */
-function diasDaSemana(): string[] {
+/**
+ * As 7 datas locais (`YYYY-MM-DD`) de uma semana, segunda a domingo. `offsetSemanas` desloca
+ * a partir da semana corrente (0 = esta, -1 = passada, 1 = próxima).
+ */
+function diasDaSemana(offsetSemanas = 0): string[] {
   const seg = dataLocalDe(inicioDaSemanaISO())
+  seg.setDate(seg.getDate() + offsetSemanas * 7)
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(seg)
     d.setDate(d.getDate() + i)
@@ -98,24 +142,41 @@ function diasDaSemana(): string[] {
   })
 }
 
+/** "3 – 9 de ago" / "28 de set – 4 de out" — rótulo do intervalo da semana navegada. */
+function rotuloDaSemana(dias: string[]): string {
+  const ini = dataLocalDe(dias[0])
+  const fim = dataLocalDe(dias[6])
+  const mesDe = (d: Date) => d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+  return mesDe(ini) === mesDe(fim)
+    ? `${ini.getDate()} – ${fim.getDate()} de ${mesDe(fim)}`
+    : `${ini.getDate()} de ${mesDe(ini)} – ${fim.getDate()} de ${mesDe(fim)}`
+}
+
 const ALTURA_LINHA = 56
 
 /**
- * P1 · Minha agenda — o hub do painel. Duas pendências no topo, com contagens vindas dos
- * TOTAIS DO ENVELOPE (`totalPendenteRegistro`, `totalLinkMeetFalhou`), calculados sobre o
- * período inteiro: contar a página funcionaria só na primeira e mentiria em todas as
- * outras, e uma pendência na página 3 ficaria invisível — o pior modo de falha do painel.
+ * P1 · Minha agenda — o hub do painel. A lista abre em "Próximas": o passado continua
+ * alcançável pelo filtro de período, mas não ocupa mais as primeiras páginas.
  *
- * Clicar numa pendência FILTRA no servidor (D15). Os totais não mudam com o filtro, para o
- * destaque continuar dizendo quantas existem.
+ * Duas pendências no topo, com contagens vindas dos TOTAIS DO ENVELOPE
+ * (`totalPendenteRegistro`, `totalLinkMeetFalhou`) de uma busca PRÓPRIA, que cobre passado
+ * e futuro independentemente do período escolhido. Contar a página funcionaria só na
+ * primeira e mentiria em todas as outras; e amarrar ao período escolhido zeraria as
+ * pendências no default, já que "aguardando registro" mora no passado.
+ *
+ * Clicar numa pendência FILTRA no servidor (D15) e, quando preciso, abre o período que a
+ * contém. Os totais não mudam com o filtro, para o destaque continuar dizendo quantas existem.
  */
 export function AgendaView() {
   const [pendencia, setPendencia] = useState<Pendencia>('todas')
+  const [periodo, setPeriodo] = useState<ChavePeriodo>('proximas')
   const [filtroStatus, setFiltroStatus] = useState(FILTROS_STATUS[0])
   const [filtroTipo, setFiltroTipo] = useState<SessaoResumo['tipo'] | 'todos'>('todos')
   const [pagina, setPagina] = useState(0)
   const [acumulado, setAcumulado] = useState<SessaoResumo[]>([])
   const [variante, setVariante] = useState<'dia' | 'semana'>('dia')
+  /** Semana visível na visão "Semana": 0 = a corrente, -1 = anterior, 1 = seguinte. */
+  const [semanaOffset, setSemanaOffset] = useState(0)
   const [diaSel, setDiaSel] = useState(() => {
     // Índice (0 = segunda) do dia de hoje na semana corrente.
     const hoje = hojeISO()
@@ -128,7 +189,7 @@ export function AgendaView() {
   const nomeDoTipo = (codigo: SessaoResumo['tipo']) =>
     catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
-  const { de, ate } = janela()
+  const { de, ate } = janela(periodo)
   const { dados, carregando, erro, recarregar } = useRecurso(
     () =>
       m04.GET('/profissional/agenda', {
@@ -145,25 +206,68 @@ export function AgendaView() {
           },
         },
       }),
-    [pendencia, filtroStatus.chave, filtroTipo, pagina],
+    [pendencia, periodo, filtroStatus.chave, filtroTipo, pagina],
   )
 
-  // Página 0 substitui; as seguintes acumulam (mesma ideia do "Ver mais" das listas).
-  const itens = pagina === 0 ? (dados?.content ?? []) : [...acumulado, ...(dados?.content ?? [])]
+  // Página 0 substitui; as seguintes acumulam (mesma ideia do "Ver mais" das listas),
+  // deduplicando por `id`: sem ordenação estável no servidor a mesma sessão pode voltar em
+  // duas páginas, o que rendia "duplicate key" no React e cards repetidos na tela.
+  const itens = pagina === 0 ? (dados?.content ?? []) : juntarSemRepetir(acumulado, dados?.content ?? [])
   const dias = porDia(itens)
   const vazio = !carregando && !erro && itens.length === 0
   const temMais = dados ? pagina + 1 < dados.totalPages : false
 
-  // ── Métricas do topo — 3 chamadas leves extras (só contagem/soma), independentes do
-  // fetch principal e da paginação, para não mentir sobre um período que a página 0 não
-  // cobre inteiro.
-  const { dados: metricaSemana } = useRecurso(
+  /**
+   * Pendências (aguardando registro / sala falhou) — buscadas num período PRÓPRIO, que
+   * sempre inclui o passado, e nunca no período que a profissional escolheu na lista.
+   *
+   * Sem isso elas somem no default: "aguardando registro" é sessão que já passou, então
+   * com o período em "Próximas" o envelope devolveria sempre 0 e o painel diria que não há
+   * pendência — justamente o alerta que ele existe para dar.
+   */
+  const { dados: pendencias } = useRecurso(
     () =>
       m04.GET('/profissional/agenda', {
-        params: { query: { de: `${hojeISO()}T00:00:00Z`, ate: `${emDiasISO(7)}T23:59:59Z`, page: 0, size: 1 } },
+        params: {
+          query: {
+            de: `${emDiasISO(-DIAS_PASSADO)}T00:00:00Z`,
+            ate: `${emDiasISO(HORIZONTE_AGENDAMENTO_DIAS)}T23:59:59Z`,
+            page: 0,
+            size: 1,
+          },
+        },
       }),
     [],
   )
+  const totalPendenteRegistro = pendencias?.totalPendenteRegistro ?? 0
+  const totalLinkMeetFalhou = pendencias?.totalLinkMeetFalhou ?? 0
+
+  // ── Métricas do topo — 3 chamadas leves extras (só contagem/soma), independentes do
+  // fetch principal e da paginação, para não mentir sobre um período que a página 0 não
+  // cobre inteiro.
+  //
+  // O filtro de status aqui NÃO é detalhe: o card diz "sessões marcadas", e sem ele a
+  // contagem incluía canceladas e não-compareceu. Numa agenda com histórico de cancelamento
+  // isso inflava muito (medido: 16 "marcadas" para 4 sessões realmente de pé).
+  const { dados: metricaSemana } = useRecurso(
+    () =>
+      m04.GET('/profissional/agenda', {
+        params: {
+          query: {
+            de: `${hojeISO()}T00:00:00Z`,
+            ate: `${emDiasISO(7)}T23:59:59Z`,
+            status: ['Agendada', 'Confirmada'],
+            page: 0,
+            size: 1,
+          },
+        },
+      }),
+    [],
+  )
+  // Conta TODAS as canceladas do período, sem distinguir quem cancelou: `canceladaPor` não
+  // existe no `SessaoResumo` da listagem nem como filtro de query (só na `Sessao` completa).
+  // Por isso o rótulo fala em "canceladas", e não "canceladas pelas usuárias" — dizer o
+  // segundo seria atribuir à usuária cancelamentos que a própria profissional fez.
   const { dados: metricaCanceladas } = useRecurso(
     () =>
       m04.GET('/profissional/agenda', {
@@ -190,9 +294,10 @@ export function AgendaView() {
     .filter((s) => s.status === 'Agendada' || s.status === 'Confirmada' || s.status === 'Realizada')
     .reduce((soma, s) => soma + (s.valorPraticado ?? 0), 0)
 
-  // ── Semana — um único fetch cobre a semana corrente inteira; alimenta a visão "Semana",
-  // o card "Ritmo da semana" e o card "Próxima sessão" da sidebar, sem 2ª fonte de dados.
-  const diasSemanaISO = diasDaSemana()
+  // ── Semana — um fetch cobre a semana VISÍVEL inteira (a corrente ou outra, conforme o
+  // `semanaOffset`); alimenta a visão "Semana" e o card "Ritmo da semana", que andam juntos.
+  // "Próxima sessão" NÃO sai daqui: ver o fetch dedicado logo abaixo.
+  const diasSemanaISO = diasDaSemana(semanaOffset)
   const { dados: semanaDados } = useRecurso(
     () =>
       m04.GET('/profissional/agenda', {
@@ -208,12 +313,46 @@ export function AgendaView() {
     [diasSemanaISO[0]],
   )
   const semanaItens = semanaDados?.content ?? []
+  // TODAS as sessões (qualquer status) — alimenta a grade detalhada do dia (`blocosDoDia`),
+  // onde ver uma sessão cancelada faz sentido: é o histórico real daquele horário.
   const semanaPorDia = diasSemanaISO.map((iso) => semanaItens.filter((s) => chaveDoDia(s.dataHora) === iso))
-  const maxNaSemana = Math.max(1, ...semanaPorDia.map((d) => d.length))
+  // Só o que representa trabalho de verdade (feito ou por vir) — alimenta os indicadores
+  // AGREGADOS (Ritmo da semana, pontinhos do seletor de dia). Sem este filtro, um dia com
+  // várias cancelas/não-compareceu no passado aparecia como o mais "cheio" da semana, quando
+  // na prática não sobrou nenhuma sessão de pé nele.
+  const semanaAtivas = semanaItens.filter((s) => s.status !== 'Cancelada' && s.status !== 'NaoCompareceu')
+  const semanaAtivasPorDia = diasSemanaISO.map((iso) => semanaAtivas.filter((s) => chaveDoDia(s.dataHora) === iso))
+  const maxNaSemana = Math.max(1, ...semanaAtivasPorDia.map((d) => d.length))
 
+  /**
+   * "Próxima sessão" — busca PRÓPRIA, de hoje até o fim do horizonte, por dois motivos:
+   *
+   * 1. Ela é absoluta: não pode mudar quando a profissional navega para outra semana na
+   *    grade, senão o card passaria a mostrar "a próxima daquela semana" — ou nada, ao
+   *    olhar o passado.
+   * 2. Antes saía dos dados da semana corrente e por isso sumia quando a próxima sessão
+   *    caía depois de domingo — bem o caso de quem tem a agenda mais espaçada.
+   *
+   * Ordena no cliente porque o endpoint não garante ordem (ver TASKS_BACKEND_M04.md).
+   */
+  const { dados: proximaDados } = useRecurso(
+    () =>
+      m04.GET('/profissional/agenda', {
+        params: {
+          query: {
+            de: `${hojeISO()}T00:00:00Z`,
+            ate: `${emDiasISO(HORIZONTE_AGENDAMENTO_DIAS)}T23:59:59Z`,
+            status: ['Agendada', 'Confirmada'],
+            page: 0,
+            size: 50,
+          },
+        },
+      }),
+    [],
+  )
   const agora = new Date()
-  const proximaSessao = semanaItens
-    .filter((s) => (s.status === 'Agendada' || s.status === 'Confirmada') && new Date(s.dataHora) >= agora)
+  const proximaSessao = (proximaDados?.content ?? [])
+    .filter((s) => new Date(s.dataHora) >= agora)
     .sort((a, b) => a.dataHora.localeCompare(b.dataHora))[0]
 
   // Grade de horário da visão Semana: limites derivados dos horários reais da semana (não
@@ -234,8 +373,42 @@ export function AgendaView() {
     }
   })
 
+  /**
+   * Navega entre semanas. O dia selecionado acompanha: ao sair da semana corrente ele vai
+   * para segunda (o começo do que se está olhando); ao voltar para ela, cai em hoje — que
+   * é o que a profissional espera encontrar destacado.
+   *
+   * Para TRÁS não há limite: rever o histórico é uso legítimo da agenda. Para FRENTE trava
+   * no horizonte de agendamento — além dele nada pode ser marcado, então as semanas são
+   * comprovadamente vazias e navegar para lá só frustraria.
+   */
+  const irParaSemana = (offset: number) => {
+    const alvo = Math.min(offset, HORIZONTE_AGENDAMENTO_SEMANAS)
+    setSemanaOffset(alvo)
+    const dias = diasDaSemana(alvo)
+    const i = dias.indexOf(hojeISO())
+    setDiaSel(i === -1 ? 0 : i)
+  }
+
+  const trocarVariante = (v: 'dia' | 'semana') => {
+    setVariante(v)
+    // Voltar para "Por dia" volta para a semana corrente: o offset não aparece nessa visão,
+    // e deixá-lo preso faria o "Ritmo da semana" da lateral falar de outra semana em silêncio.
+    if (v === 'dia' && semanaOffset !== 0) irParaSemana(0)
+  }
+
   const trocarFiltro = (p: Pendencia) => {
     setPendencia(p)
+    // "Aguardando registro" é, por definição, sessão que JÁ passou. Com o período em
+    // "Próximas" o filtro devolveria zero e a pendência pareceria resolvida — então
+    // clicar nela abre o período que a contém.
+    if (p === 'registro' && periodo === 'proximas') setPeriodo('todas')
+    setPagina(0)
+    setAcumulado([])
+  }
+
+  const trocarPeriodo = (p: ChavePeriodo) => {
+    setPeriodo(p)
     setPagina(0)
     setAcumulado([])
   }
@@ -262,13 +435,13 @@ export function AgendaView() {
       <PageHeader
         eyebrow="Atendimento"
         title="Minha agenda"
-        description="Últimos 14 dias e próximos 30, do jeito que você atende."
+        description="Últimos 14 dias e tudo o que já está marcado à frente."
         action={
           <div className="flex items-center gap-3">
             <div className="flex gap-1 rounded-pill border border-plum/7 bg-cream p-1">
               <button
                 type="button"
-                onClick={() => setVariante('dia')}
+                onClick={() => trocarVariante('dia')}
                 className={cn(
                   'rounded-pill px-4 py-2 text-[13px] font-medium transition-colors',
                   variante === 'dia' ? 'bg-white font-semibold text-mauve shadow-sm' : 'text-plum/55',
@@ -278,7 +451,7 @@ export function AgendaView() {
               </button>
               <button
                 type="button"
-                onClick={() => setVariante('semana')}
+                onClick={() => trocarVariante('semana')}
                 className={cn(
                   'rounded-pill px-4 py-2 text-[13px] font-medium transition-colors',
                   variante === 'semana' ? 'bg-white font-semibold text-mauve shadow-sm' : 'text-plum/55',
@@ -305,14 +478,14 @@ export function AgendaView() {
         <Metrica rotulo="Próximos 7 dias" valor={String(metricaSemana?.totalElements ?? '—')} nota="sessões marcadas" />
         <Metrica
           rotulo="Aguardando registro"
-          valor={String(dados?.totalPendenteRegistro ?? '—')}
+          valor={pendencias ? String(totalPendenteRegistro) : '—'}
           nota="já aconteceram"
           cor="text-mauve"
         />
         <Metrica
           rotulo="Últimos 14 dias"
           valor={String(metricaCanceladas?.totalElements ?? '—')}
-          nota="canceladas pelas usuárias"
+          nota="canceladas"
         />
         <Metrica rotulo="Previsto no mês" valor={reais(previstoNoMes) ?? 'R$ 0,00'} nota="sessões agendadas e realizadas" />
       </div>
@@ -320,22 +493,22 @@ export function AgendaView() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_316px]">
         <div className="min-w-0">
           {/* Pendências */}
-          {dados && (dados.totalPendenteRegistro > 0 || dados.totalLinkMeetFalhou > 0) && (
+          {(totalPendenteRegistro > 0 || totalLinkMeetFalhou > 0) && (
             <div className="mb-5 grid gap-3 sm:grid-cols-2">
-              {dados.totalPendenteRegistro > 0 && (
+              {totalPendenteRegistro > 0 && (
                 <Pendente
                   tom="mauve"
                   ativo={pendencia === 'registro'}
-                  titulo={`${dados.totalPendenteRegistro} ${dados.totalPendenteRegistro === 1 ? 'sessão aguardando registro' : 'sessões aguardando registro'}`}
+                  titulo={`${totalPendenteRegistro} ${totalPendenteRegistro === 1 ? 'sessão aguardando registro' : 'sessões aguardando registro'}`}
                   descricao="Elas já aconteceram e precisam do seu registro."
                   onClick={() => trocarFiltro(pendencia === 'registro' ? 'todas' : 'registro')}
                 />
               )}
-              {dados.totalLinkMeetFalhou > 0 && (
+              {totalLinkMeetFalhou > 0 && (
                 <Pendente
                   tom="alerta"
                   ativo={pendencia === 'sala'}
-                  titulo={`${dados.totalLinkMeetFalhou} ${dados.totalLinkMeetFalhou === 1 ? 'sala precisa' : 'salas precisam'} de link manual`}
+                  titulo={`${totalLinkMeetFalhou} ${totalLinkMeetFalhou === 1 ? 'sala precisa' : 'salas precisam'} de link manual`}
                   descricao="Não conseguimos criar a sala automaticamente."
                   onClick={() => trocarFiltro(pendencia === 'sala' ? 'todas' : 'sala')}
                 />
@@ -355,6 +528,26 @@ export function AgendaView() {
 
           {variante === 'dia' && (
             <div className="mb-5 flex flex-wrap items-center gap-3">
+              {/* Período primeiro: é o corte mais grosso e o que decide se a lista fala do
+                  que vem ou do que passou. Status e tipo refinam dentro dele. */}
+              <div className="flex w-full flex-wrap gap-2 border-b border-plum/8 pb-4">
+                {FILTROS_PERIODO.map((p) => (
+                  <button
+                    key={p.chave}
+                    type="button"
+                    onClick={() => trocarPeriodo(p.chave)}
+                    className={cn(
+                      'rounded-pill border px-4 py-2 text-[13px] font-medium transition-colors',
+                      p.chave === periodo
+                        ? 'border-mauve bg-mauve text-white'
+                        : 'border-plum/12 bg-white text-plum/70 hover:border-plum/25',
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 {FILTROS_STATUS.map((f) => (
                   <button
@@ -475,9 +668,50 @@ export function AgendaView() {
             </Estado>
           ) : (
             <div>
+              {/* Navegação entre semanas. Sem limite para trás nem para frente: a agenda é
+                  da profissional e olhar o histórico ou o que vem longe é legítimo. O botão
+                  "Hoje" só aparece fora da semana corrente, que é quando ele tem função. */}
+              <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-plum/7 bg-white px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => irParaSemana(semanaOffset - 1)}
+                  aria-label="Semana anterior"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-plum/60 transition-es hover:bg-plum/5"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[13.5px] font-medium text-plum">{rotuloDaSemana(diasSemanaISO)}</span>
+                  {semanaOffset !== 0 && (
+                    <button
+                      type="button"
+                      onClick={() => irParaSemana(0)}
+                      className="rounded-pill border border-mauve/25 px-3 py-1 text-[12px] font-semibold text-mauve transition-es hover:border-mauve/45"
+                    >
+                      Hoje
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => irParaSemana(semanaOffset + 1)}
+                  disabled={semanaOffset >= HORIZONTE_AGENDAMENTO_SEMANAS}
+                  aria-label="Próxima semana"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-plum/60 transition-es hover:bg-plum/5 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </div>
+
               <div className="mb-5 grid grid-cols-7 gap-2">
                 {diasSemanaISO.map((iso, i) => {
-                  const qtd = semanaPorDia[i].length
+                  const qtd = semanaAtivasPorDia[i].length
                   const sel = diaSel === i
                   const nomeDia = dataLocalDe(iso).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
                   return (
@@ -574,14 +808,14 @@ export function AgendaView() {
             </div>
           )}
 
-          {dados && dados.totalPendenteRegistro > 0 && (
+          {totalPendenteRegistro > 0 && (
             <div className="rounded-card border border-mauve/[0.16] bg-white p-[22px] shadow-[0_4px_24px_rgba(45,24,64,0.05)]">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-pill bg-mauve" />
                 <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-mauve">Precisa de você</p>
               </div>
               <p className="mt-2.5 font-display text-lg leading-tight text-plum">
-                {dados.totalPendenteRegistro} {dados.totalPendenteRegistro === 1 ? 'sessão aguardando registro' : 'sessões aguardando registro'}
+                {totalPendenteRegistro} {totalPendenteRegistro === 1 ? 'sessão aguardando registro' : 'sessões aguardando registro'}
               </p>
               <p className="mt-2 text-[13px] leading-relaxed text-plum/58">
                 Já aconteceram. O registro é o que confirma o atendimento — e ele é definitivo.
@@ -597,17 +831,29 @@ export function AgendaView() {
           )}
 
           <div className="rounded-card border border-plum/5 bg-white p-[22px] shadow-[0_4px_24px_rgba(45,24,64,0.05)]">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-plum/40">Ritmo da semana</p>
-            <div className="mt-4 flex h-[74px] items-end gap-2">
-              {semanaPorDia.map((sessoes, i) => (
+            {/* O intervalo fica explícito porque este card acompanha a navegação da visão
+                "Semana" — sem ele, ao navegar, o gráfico falaria de outra semana calado. */}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-plum/40">Ritmo da semana</p>
+              <span className="text-[11px] text-plum/40">{rotuloDaSemana(diasSemanaISO)}</span>
+            </div>
+            {/* A barra mais alta usa os 74px inteiros (de propósito — é o "cheio" da
+                semana), então o rótulo do dia NÃO pode dividir essa altura com ela: sem
+                espaço próprio, o item ficava mais alto que os 74px do container e, sem
+                corte, estourava por cima — sobre o título. Por isso a altura fixa envolve
+                só a barra; o rótulo vem depois, em fluxo normal, com sua própria altura. */}
+            <div className="mt-4 flex items-end gap-2">
+              {semanaAtivasPorDia.map((sessoes, i) => (
                 <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                  <span
-                    className="w-full rounded-t-[5px] rounded-b-[2px]"
-                    style={{
-                      height: sessoes.length === 0 ? '4px' : `${Math.round(14 + (sessoes.length / maxNaSemana) * 60)}px`,
-                      background: sessoes.length >= maxNaSemana ? 'var(--color-mauve)' : 'var(--color-mauve-soft)',
-                    }}
-                  />
+                  <div className="flex h-[74px] w-full items-end">
+                    <span
+                      className="w-full rounded-t-[5px] rounded-b-[2px]"
+                      style={{
+                        height: sessoes.length === 0 ? '4px' : `${Math.round(14 + (sessoes.length / maxNaSemana) * 60)}px`,
+                        background: sessoes.length >= maxNaSemana ? 'var(--color-mauve)' : 'var(--color-mauve-soft)',
+                      }}
+                    />
+                  </div>
                   <span className="text-[10.5px] text-plum/42">{dataLocalDe(diasSemanaISO[i]).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
                 </div>
               ))}

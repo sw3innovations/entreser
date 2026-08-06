@@ -7,6 +7,16 @@ import { comRetry, mensagemDeRede } from './rede'
 type Pagina<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number }
 type Resultado<T> = { data?: Pagina<T>; error?: unknown; response: Response }
 
+/**
+ * Concatena preservando a ordem de chegada e descartando o que já está na lista. Mantém a
+ * ocorrência ANTIGA (não a nova) porque ela já está renderizada: trocar por uma cópia
+ * idêntica só causaria remontagem sem ganho.
+ */
+export function juntarSemRepetir<T extends { id: string }>(atuais: T[], novos: T[]): T[] {
+  const vistos = new Set(atuais.map((i) => i.id))
+  return [...atuais, ...novos.filter((i) => !vistos.has(i.id))]
+}
+
 export interface EstadoLista<T> {
   itens: T[]
   /** Total do servidor (`totalElements`) — NUNCA `itens.length`. */
@@ -25,8 +35,13 @@ export interface EstadoLista<T> {
  * (e refaz quando `deps` muda ou em `recarregar`), acumula o `content` a cada página, e só
  * mostra "Ver mais" enquanto `page+1 < totalPages`. A posição vem de `totalElements`, nunca
  * de `itens.length`. `fn(page)` recebe o número da página a buscar. Só GET.
+ *
+ * `T` exige `id` porque a acumulação DEDUPLICA por ele: sem ordenação estável no servidor
+ * (ver TASKS_BACKEND_M04.md), a mesma sessão pode voltar em duas páginas — o que rendia
+ * "duplicate key" no React e itens repetidos na tela. Deduplicar é barato e deixa a lista
+ * correta mesmo que a paginação do servidor oscile.
  */
-export function useListaPaginada<T>(
+export function useListaPaginada<T extends { id: string }>(
   fn: (page: number) => Promise<Resultado<T>>,
   deps: readonly unknown[] = [],
 ): EstadoLista<T> {
@@ -85,7 +100,7 @@ export function useListaPaginada<T>(
         if (r.error) {
           setErro(codigo(r.error) ? mensagemDe(codigo(r.error)) : mensagemDeRede(r.response?.status))
         } else {
-          setItens((cur) => [...cur, ...(r.data?.content ?? [])])
+          setItens((cur) => juntarSemRepetir(cur, r.data?.content ?? []))
           setPage(prox)
           if (r.data) {
             setTotal(r.data.totalElements)
