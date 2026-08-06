@@ -13,6 +13,70 @@ import type { paths } from './schema'
  */
 
 /**
+ * Um 204/205 não tem corpo para o `openapi-fetch` ler (ele devolve `data: undefined` sem
+ * tocar no stream). O stream não-consumido é cancelado no GC/re-render seguinte, e o painel
+ * de rede marca a requisição como `ERR_ABORTED` mesmo com o status entregue. Drenar o corpo
+ * (vazio) aqui fecha o stream de forma limpa — e como o `openapi-fetch` já não o lê num 204,
+ * não há dupla-leitura.
+ */
+async function drenarSemConteudo(response: Response): Promise<Response> {
+  if (response.status === 204 || response.status === 205) {
+    try {
+      await response.arrayBuffer()
+    } catch {
+      // Corpo já ausente/consumido — nada a fazer.
+    }
+  }
+  return response
+}
+
+/**
+ * Dedup de GET em andamento. Duas leituras IDÊNTICAS disparadas juntas — o Strict Mode do
+ * dev dobra os efeitos, e a mesma janela pode ser pedida pela página e pela sidebar ao mesmo
+ * tempo — passam a compartilhar UMA resposta de rede em vez de baterem no servidor duas
+ * vezes. Só GET (idempotente); escrita nunca é deduplicada. Chave = URL completa (path +
+ * query), então janelas diferentes seguem sendo requisições distintas.
+ *
+ * Registrado ANTES do `auth`: uma requisição "carona" curto-circuita aqui e nem chega a
+ * pedir token nem a clonar o request.
+ */
+const emVoo = new Map<string, { resolver: (r: Response) => void; promessa: Promise<Response> }>()
+
+const dedupGet: Middleware = {
+  async onRequest({ request }) {
+    if (request.method !== 'GET') return undefined
+    const emAndamento = emVoo.get(request.url)
+    if (emAndamento) {
+      // Carona: espera a resposta da requisição idêntica e devolve um clone (curto-circuito).
+      const r = await emAndamento.promessa
+      return r.clone()
+    }
+    // Primeira: registra o deferred; resolvido em `onResponse`, limpo em `onResponse`/`onError`.
+    let resolver!: (r: Response) => void
+    const promessa = new Promise<Response>((res) => {
+      resolver = res
+    })
+    emVoo.set(request.url, { resolver, promessa })
+    return undefined
+  },
+  onResponse({ request, response }) {
+    if (request.method === 'GET') {
+      const entrada = emVoo.get(request.url)
+      if (entrada) {
+        // O clone guardado fica intacto (nunca é lido direto); cada carona clona a partir dele.
+        entrada.resolver(response.clone())
+        emVoo.delete(request.url)
+      }
+    }
+    return response
+  },
+  onError({ request }) {
+    if (request?.method === 'GET') emVoo.delete(request.url)
+    return undefined
+  },
+}
+
+/**
  * Clone da requisição por `id` (único por request no openapi-fetch), tirado ANTES de o
  * fetch consumir o body — é o que permite reenviar um POST/PATCH após o refresh (o body
  * original já foi consumido pela primeira tentativa). Preenchido em `onRequest`, sempre
@@ -39,16 +103,16 @@ const auth: Middleware = {
   async onResponse({ response, id }) {
     const original = pendentes.get(id)
     pendentes.delete(id)
-    if (response.status !== 401) return response
+    if (response.status !== 401) return drenarSemConteudo(response)
 
     const refreshed = await refreshSession()
-    if (!refreshed || !original) return response
+    if (!refreshed || !original) return drenarSemConteudo(response)
 
     const token = getAccessToken()
     if (token) original.headers.set('Authorization', `Bearer ${token}`)
     // Reenvio fora do pipeline do openapi-fetch: não reintercepta, então não há loop —
     // se este também vier 401, a resposta sobe para a tela.
-    return fetch(original)
+    return drenarSemConteudo(await fetch(original))
   },
 
   onError({ id }) {
@@ -68,4 +132,6 @@ export const m04 = createClient<paths>({
    */
   querySerializer: { array: { style: 'form', explode: false } },
 })
+// Ordem importa: `dedupGet` antes de `auth` — a carona curto-circuita antes de pedir token.
+m04.use(dedupGet)
 m04.use(auth)
