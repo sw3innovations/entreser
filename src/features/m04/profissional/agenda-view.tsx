@@ -425,6 +425,17 @@ export function AgendaView() {
     setAcumulado([])
   }
 
+  /** Algum filtro fora do padrão? ("Próximas" + todos os status + todos os tipos). */
+  const temFiltroAtivo = periodo !== 'proximas' || filtroStatus.chave !== 'todos' || filtroTipo !== 'todos'
+
+  const limparFiltros = () => {
+    setPeriodo('proximas')
+    setFiltroStatus(FILTROS_STATUS[0])
+    setFiltroTipo('todos')
+    setPagina(0)
+    setAcumulado([])
+  }
+
   const verMais = () => {
     setAcumulado(itens)
     setPagina((p) => p + 1)
@@ -526,26 +537,57 @@ export function AgendaView() {
             </button>
           )}
 
+          {/* Filtros em DOIS níveis, não três fileiras de pílulas iguais.
+
+              O período é o corte grosso — decide se a lista fala do que vem ou do que
+              passou — então ganha o mesmo segmented control do "Por dia / Semana": a forma
+              já comunica "escolha um escopo". Situação e tipo refinam dentro dele e ficam
+              em pílulas/select, um degrau abaixo. Antes os três tinham o mesmo peso visual
+              e só uma linha divisória sugeria a hierarquia. */}
           {variante === 'dia' && (
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              {/* Período primeiro: é o corte mais grosso e o que decide se a lista fala do
-                  que vem ou do que passou. Status e tipo refinam dentro dele. */}
-              <div className="flex w-full flex-wrap gap-2 border-b border-plum/8 pb-4">
-                {FILTROS_PERIODO.map((p) => (
-                  <button
-                    key={p.chave}
-                    type="button"
-                    onClick={() => trocarPeriodo(p.chave)}
-                    className={cn(
-                      'rounded-pill border px-4 py-2 text-[13px] font-medium transition-colors',
-                      p.chave === periodo
-                        ? 'border-mauve bg-mauve text-white'
-                        : 'border-plum/12 bg-white text-plum/70 hover:border-plum/25',
-                    )}
+            <div className="mb-5 flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-1 rounded-pill border border-plum/7 bg-cream p-1">
+                  {FILTROS_PERIODO.map((p) => (
+                    <button
+                      key={p.chave}
+                      type="button"
+                      onClick={() => trocarPeriodo(p.chave)}
+                      className={cn(
+                        'rounded-pill px-4 py-2 text-[13px] font-medium transition-colors',
+                        p.chave === periodo ? 'bg-white font-semibold text-mauve shadow-sm' : 'text-plum/55',
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Só aparece quando há o que limpar — com três dimensões de filtro é
+                      fácil acabar numa lista vazia sem lembrar o que está ativo. */}
+                  {temFiltroAtivo && (
+                    <button
+                      type="button"
+                      onClick={limparFiltros}
+                      className="text-[13px] font-medium text-mauve transition-es hover:text-mauve-dark"
+                    >
+                      Limpar filtros
+                    </button>
+                  )}
+                  <select
+                    value={filtroTipo}
+                    onChange={(e) => trocarTipo(e.target.value as SessaoResumo['tipo'] | 'todos')}
+                    className="rounded-pill border border-plum/12 bg-white px-4 py-2 text-[13px] font-medium text-plum/70 transition-colors hover:border-plum/25 focus:outline-none focus:ring-1 focus:ring-mauve/40"
                   >
-                    {p.label}
-                  </button>
-                ))}
+                    <option value="todos">Todos os tipos</option>
+                    {catalogo?.tipos.map((t) => (
+                      <option key={t.codigo} value={t.codigo}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -565,19 +607,6 @@ export function AgendaView() {
                   </button>
                 ))}
               </div>
-
-              <select
-                value={filtroTipo}
-                onChange={(e) => trocarTipo(e.target.value as SessaoResumo['tipo'] | 'todos')}
-                className="rounded-pill border border-plum/12 bg-white px-4 py-2 text-[13px] font-medium text-plum/70 transition-colors hover:border-plum/25 focus:outline-none focus:ring-1 focus:ring-mauve/40"
-              >
-                <option value="todos">Todos os tipos</option>
-                {catalogo?.tipos.map((t) => (
-                  <option key={t.codigo} value={t.codigo}>
-                    {t.nome}
-                  </option>
-                ))}
-              </select>
             </div>
           )}
 
