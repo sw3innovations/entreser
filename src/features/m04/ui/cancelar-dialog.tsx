@@ -24,6 +24,13 @@ interface Props {
    * outras inscritas. Confundir as duas faz uma participante cancelar a Roda inteira.
    */
   acao?: 'cancelarSessao' | 'sairDoGrupo'
+  /**
+   * Chamado quando o servidor responde `NAO_INSCRITA`: a saída do grupo já tinha
+   * acontecido (outra aba, ou a tela estava com dados velhos). O resultado desejado já é
+   * fato, então isto NÃO é erro — mostrar vermelho para quem conseguiu o que queria é que
+   * seria o defeito. Sem o callback, cai no tratamento de erro comum.
+   */
+  onJaSaiu?: () => void
 }
 
 /**
@@ -40,6 +47,7 @@ export function CancelarDialog({
   onCancelada,
   perfil = 'usuaria',
   acao = 'cancelarSessao',
+  onJaSaiu,
 }: Props) {
   const [motivo, setMotivo] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -67,7 +75,14 @@ export function CancelarDialog({
             body: motivo.trim() ? { motivo: motivo.trim() } : {},
           })
       if (error) {
-        setErro(mensagemDe((error as { code?: string }).code))
+        const code = (error as { code?: string }).code
+        // "Não inscrita" numa saída de grupo = já saiu. O objetivo está cumprido; tratar
+        // como erro só confundiria quem conseguiu exatamente o que pediu.
+        if (code === 'NAO_INSCRITA' && ehSaidaDeGrupo && onJaSaiu) {
+          onJaSaiu()
+          return
+        }
+        setErro(mensagemDe(code))
         return
       }
       if (data) onCancelada(data.sessao, data.cobrancaAplicada)

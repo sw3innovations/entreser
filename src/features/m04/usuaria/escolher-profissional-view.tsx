@@ -59,6 +59,7 @@ export function EscolherProfissionalView({ tipo }: { tipo: TipoSessao }) {
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Agendar"
         title="Escolha a profissional"
         description="Quem você quer que acompanhe este momento."

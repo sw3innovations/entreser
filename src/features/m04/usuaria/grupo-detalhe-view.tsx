@@ -103,6 +103,7 @@ export function GrupoDetalheView({ tipo, sessaoId }: { tipo: TipoSessao; sessaoI
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Sessão em grupo"
         title={dados?.tituloGrupo ?? 'Sessão em grupo'}
         description={dados ? dataHoraPorExtenso(dados.dataHora) : undefined}

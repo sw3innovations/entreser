@@ -25,6 +25,19 @@ export function dataHoraPorExtenso(iso: string): string {
   return `${data}, às ${hora(iso)}`
 }
 
+/**
+ * "TER" / 11 / "AGO" — as três partes do bloco de data em cartão, o mesmo âncora visual
+ * da confirmação (U5) e da tela de sucesso (U5b). Compartilhado para as duas telas
+ * mostrarem a MESMA peça: a continuidade é o que faz a segunda parecer a conclusão da
+ * primeira, e não outra tela qualquer.
+ */
+export function blocoData(iso: string): { dia: string; numero: number; mes: string } {
+  const d = new Date(iso)
+  const dia = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
+  const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
+  return { dia, numero: d.getDate(), mes }
+}
+
 /** "14:00" no fuso local. */
 export function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -60,7 +73,7 @@ export function hojeISO(): string {
   return `${d.getFullYear()}-${mes}-${dia}`
 }
 
-/** `YYYY-MM-DD` daqui a `dias` (janela da U4 — D24: próximos 30 dias). */
+/** `YYYY-MM-DD` daqui a `dias` (aceita negativo para o passado). */
 export function emDiasISO(dias: number): string {
   const d = new Date()
   d.setDate(d.getDate() + dias)
@@ -91,6 +104,45 @@ export function fimDaSemanaISO(): string {
   const offset = diaSemana === 0 ? 0 : 7 - diaSemana
   d.setDate(d.getDate() + offset)
   return paraISO(d)
+}
+
+/**
+ * Até onde é possível marcar — e, por consequência, até onde a agenda da profissional
+ * PRECISA enxergar. As duas pontas leem esta constante porque elas formam uma invariante:
+ * toda sessão que a usuária consegue marcar tem de aparecer para quem vai atendê-la.
+ *
+ * Já quebrou uma vez: a usuária tinha teto fixo de 30 dias, igual à janela da agenda; ao
+ * trocar por navegação semana a semana o teto sumiu de um lado só, e sessões marcadas para
+ * além de 30 dias ficaram invisíveis no backoffice. Mexer aqui move as duas juntas.
+ */
+export const HORIZONTE_AGENDAMENTO_DIAS = 90
+
+/** Quantas semanas de navegação cabem no horizonte (teto do "próxima semana"). */
+export const HORIZONTE_AGENDAMENTO_SEMANAS = Math.floor(HORIZONTE_AGENDAMENTO_DIAS / 7)
+
+/**
+ * Segunda a domingo da semana `hoje + offsetSemanas` semanas, em `YYYY-MM-DD` local — base da
+ * navegação semana a semana da U4/reagendar (`offsetSemanas: 0` é a semana atual, negativo é
+ * passado). Rótulo curto pro cabeçalho: "12–18 de ago" (mesmo mês) ou, na virada de mês,
+ * "28 de jul – 3 de ago".
+ */
+export function semanaISO(offsetSemanas: number): { inicio: string; fim: string; rotulo: string } {
+  const d = new Date()
+  const diaSemana = d.getDay() // 0 = domingo
+  const offsetSegunda = diaSemana === 0 ? -6 : 1 - diaSemana
+  d.setDate(d.getDate() + offsetSegunda + offsetSemanas * 7)
+  const segunda = new Date(d)
+  const domingo = new Date(d)
+  domingo.setDate(domingo.getDate() + 6)
+
+  const mesSegunda = segunda.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+  const mesDomingo = domingo.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+  const rotulo =
+    mesSegunda === mesDomingo
+      ? `${segunda.getDate()}–${domingo.getDate()} de ${mesSegunda}`
+      : `${segunda.getDate()} de ${mesSegunda} – ${domingo.getDate()} de ${mesDomingo}`
+
+  return { inicio: paraISO(segunda), fim: paraISO(domingo), rotulo }
 }
 
 /**
@@ -143,9 +195,12 @@ export function porPeriodo<T extends { inicio: string }>(slots: T[]): { chave: P
 }
 
 /**
- * "3 dias" / "amanhã" / "hoje" até um instante futuro, arredondado pelo dia LOCAL (não pela
- * diferença exata em horas) — para a pill "Começa em…" do detalhe da sessão. `null` se o
- * instante já passou (a tela não mostra "começa em -1 dias").
+ * "3 dias" / "amanhã" / "hoje" — forma CURTA, para selos onde o rótulo já dá o contexto
+ * (ex.: a pill "4 dias" no card da próxima sessão). Arredonda pelo dia LOCAL (não pela
+ * diferença exata em horas). `null` se o instante já passou.
+ *
+ * Para frases, use `quandoAcontece`: concatenar esta aqui produz "começa em hoje" e
+ * "é 3 dias", porque só a forma numérica pede a preposição.
  */
 export function diasAte(iso: string): string | null {
   const hoje = new Date()
@@ -157,4 +212,17 @@ export function diasAte(iso: string): string | null {
   if (dias === 0) return 'hoje'
   if (dias === 1) return 'amanhã'
   return `${dias} dias`
+}
+
+/**
+ * Igual a `diasAte`, mas já pronto para entrar numa FRASE: "hoje" / "amanhã" / "em 3 dias".
+ *
+ * A preposição pertence à contagem, não ao texto ao redor — é o que evita "Começa em hoje"
+ * (com o "em" fixo na frase) e "Sua próxima sessão é 3 dias" (sem ele). Quem monta a frase
+ * escreve só "Começa {quandoAcontece}" / "…é {quandoAcontece}" e os três casos saem certos.
+ */
+export function quandoAcontece(iso: string): string | null {
+  const curto = diasAte(iso)
+  if (curto == null) return null
+  return curto === 'hoje' || curto === 'amanhã' ? curto : `em ${curto}`
 }

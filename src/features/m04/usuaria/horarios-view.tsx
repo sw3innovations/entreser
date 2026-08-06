@@ -1,8 +1,19 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyState } from '@/components/ui'
-import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon, SunriseIcon, SunIcon, MoonIcon } from '@/features/usuaria/ui'
+import {
+  PageHero,
+  PageContent,
+  HeroIconButton,
+  ArrowLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SunriseIcon,
+  SunIcon,
+  MoonIcon,
+} from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -11,10 +22,10 @@ import {
   chaveDoDia,
   diaPorExtenso,
   hora,
-  hojeISO,
-  emDiasISO,
+  semanaISO,
   reais,
   porPeriodo,
+  HORIZONTE_AGENDAMENTO_SEMANAS,
   type PeriodoChave,
 } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
@@ -27,6 +38,10 @@ const ICONE_DO_PERIODO: Record<PeriodoChave, typeof SunriseIcon> = {
   tarde: SunIcon,
   noite: MoonIcon,
 }
+
+/** Teto da navegação — automática e manual. É o horizonte de agendamento: além dele a
+ * sessão marcada não apareceria na agenda da profissional. */
+const LIMITE_SEMANAS = HORIZONTE_AGENDAMENTO_SEMANAS
 
 /**
  * Agrupa os slots por dia no fuso da USUÁRIA (não no UTC). Preserva a ordem que veio do
@@ -44,26 +59,47 @@ function porDia(slots: Slot[]): { chave: string; slots: Slot[] }[] {
 }
 
 /**
- * U4 · Horários disponíveis. Lista contínua dos próximos 30 dias, agrupada por dia e
- * trazendo só os dias que TÊM horário (D24 — sem calendário navegável: com agenda
- * esparsa, a grade fica quase toda vazia). O backend já filtrou o que não pode ser
- * marcado, então a tela nunca desabilita um horário: se veio, é selecionável.
- * Escolher um horário leva à confirmação (U5).
+ * U4 · Horários disponíveis. Navegação semana a semana (#3): a cada semana, agrupa por dia
+ * e traz só os dias que TÊM horário — com agenda esparsa, uma grade fixa ficaria quase toda
+ * vazia. `semana` é um offset a partir da semana atual (0 = esta semana); "Anterior" trava
+ * em 0 porque não dá pra marcar no passado. O backend já filtrou o que não pode ser
+ * marcado, então a tela nunca desabilita um horário: se veio, é selecionável. Escolher um
+ * horário leva à confirmação (U5).
  */
 export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profissionalId: string }) {
   const router = useRouter()
   const voltar = useVoltar(`/agendar/${tipo}`)
+  const [semana, setSemana] = useState(0)
+  const semanaAtual = semanaISO(semana)
+  // Só busca a 1ª semana com horário sozinho ATÉ a pessoa navegar manualmente — depois
+  // disso, "Anterior"/"Próxima" mandam, mesmo que caiam numa semana vazia.
+  const autoBuscandoRef = useRef(true)
 
   const { dados, carregando, erro, recarregar } = useRecurso(
     () =>
       m04.GET('/profissionais/{profissionalId}/slots', {
-        params: { path: { profissionalId }, query: { tipo, inicio: hojeISO(), fim: emDiasISO(30) } },
+        params: { path: { profissionalId }, query: { tipo, inicio: semanaAtual.inicio, fim: semanaAtual.fim } },
       }),
-    [profissionalId, tipo],
+    [profissionalId, tipo, semana],
   )
 
   const dias = porDia(dados?.slots ?? [])
   const vazio = !carregando && !erro && dias.length === 0
+
+  // A cada semana entra com agenda esparsa: em vez de abrir sempre na semana atual (quase
+  // sempre vazia) e deixar a pessoa clicando "próxima" às cegas, avança sozinho até achar
+  // a primeira semana com horário — mesmo comportamento útil que a lista contínua antiga
+  // dava de graça, sem reintroduzir a janela fixa de 30 dias (D24).
+  useEffect(() => {
+    if (autoBuscandoRef.current && vazio && semana < LIMITE_SEMANAS) {
+      setSemana((s) => s + 1)
+    }
+  }, [vazio, semana])
+
+  const irParaSemana = (delta: number) => {
+    autoBuscandoRef.current = false
+    setSemana((s) => Math.min(LIMITE_SEMANAS, Math.max(0, s + delta)))
+  }
 
   const escolher = (slot: Slot) => {
     router.push(
@@ -82,6 +118,7 @@ export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profi
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Agendar"
         title="Escolha o horário"
         description={
@@ -91,6 +128,28 @@ export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profi
         }
       />
       <PageContent width="md" className="pt-6">
+        <div className="mb-5 flex items-center justify-between rounded-input border border-plum/8 bg-white px-2 py-2 shadow-card">
+          <button
+            type="button"
+            onClick={() => irParaSemana(-1)}
+            disabled={semana === 0}
+            aria-label="Semana anterior"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-plum/60 transition-es hover:bg-plum/5 disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ChevronLeftIcon size={18} />
+          </button>
+          <span className="text-[13.5px] font-medium capitalize text-plum">Semana de {semanaAtual.rotulo}</span>
+          <button
+            type="button"
+            onClick={() => irParaSemana(1)}
+            disabled={semana >= LIMITE_SEMANAS}
+            aria-label="Próxima semana"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-plum/60 transition-es hover:bg-plum/5 disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ChevronRightIcon size={18} />
+          </button>
+        </div>
+
         <Estado
           carregando={carregando}
           erro={erro}
@@ -98,8 +157,8 @@ export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profi
           aoRepetir={recarregar}
           aoVazio={
             <EmptyState
-              title="Nenhum horário disponível"
-              description="Esta profissional não tem horários livres nos próximos 30 dias. Você pode escolher outra profissional."
+              title="Nenhum horário nesta semana"
+              description="Esta profissional não tem horários livres nesta semana. Tente a próxima semana ou escolha outra profissional."
             />
           }
         >

@@ -3,7 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyState, ESButton } from '@/components/ui'
-import { PageHero, PageContent, ChevronRightIcon } from '@/features/usuaria/ui'
+import {
+  PageHero,
+  PageContent,
+  ChevronRightIcon,
+  HeroIconButton,
+  ArrowLeftIcon,
+  CalendarPlusIcon,
+} from '@/features/usuaria/ui'
+import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -38,6 +46,7 @@ const FILTROS: { chave: string; label: string; status?: StatusSessao[]; periodo?
  */
 export function MinhasSessoesView() {
   const router = useRouter()
+  const voltar = useVoltar('/home')
   const [filtro, setFiltro] = useState(FILTROS[0])
 
   const { itens, total, carregando, carregandoMais, erro, vazio, temMais, carregarMais, recarregar } =
@@ -63,14 +72,43 @@ export function MinhasSessoesView() {
   const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
   const nomeDoTipo = (s: SessaoResumo) => catalogo?.tipos.find((t) => t.codigo === s.tipo)?.nome ?? s.tipo
 
+  const topBar = (
+    <HeroIconButton aria-label="Voltar" onPress={voltar}>
+      <ArrowLeftIcon />
+    </HeroIconButton>
+  )
+
+  /**
+   * Marcar uma sessão é a ação principal desta tela — a lista é consulta, isto é o que
+   * faz avançar. Por isso é um CTA cheio (creme sobre a faixa ameixa, com sombra), e não
+   * o botão discreto de canto que era antes.
+   */
+  const agendarCta = (
+    <button
+      type="button"
+      onClick={() => router.push('/agendar')}
+      className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-pill bg-cream px-5 text-sm font-semibold text-plum shadow-[0_8px_22px_rgba(0,0,0,0.18)] transition-es hover:bg-cream-mid active:scale-[0.98] sm:w-auto"
+    >
+      <CalendarPlusIcon size={17} />
+      Agendar consulta
+    </button>
+  )
+
   return (
     <div className="min-h-dvh pb-28">
       <PageHero
         width="md"
+        topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Suas sessões"
         title="Minhas sessões"
         description="Acompanhe o que está marcado e o que já aconteceu."
-      />
+      >
+        {/* Abaixo da descrição, não no slot `aside`: ali ele dividiria a linha com o
+            título e teria de encolher justamente o botão que queremos em destaque.
+            `self-start` porque no desktop o hero envolve os filhos num flex column. */}
+        <div className="mt-5 self-start">{agendarCta}</div>
+      </PageHero>
       <PageContent width="md" className="pt-6">
         <div className="mb-5 flex gap-2">
           {FILTROS.map((f) => (

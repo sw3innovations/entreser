@@ -25,8 +25,16 @@ export const USUARIA_NAV_MOBILE: BottomNavItem[] = [
 ]
 
 /**
- * Rotas full-screen que escondem a BottomNav — leitor, onboarding e os fluxos do M04
- * (agendamento e detalhe da sessão), que têm barra de ação fixa embaixo e colidiriam
- * com a navegação.
+ * Rotas verdadeiramente full-screen: escondem HEADER (desktop) e BottomNav (mobile) —
+ * leitor de conteúdo e onboarding. Diferente dos fluxos do M04 abaixo, estas não têm um
+ * "chrome" de app ao redor em nenhum tamanho de tela.
  */
-export const NAV_HIDDEN_PREFIXES = ['/onboarding', '/conteudos/', '/agendar', '/sessoes/']
+export const NAV_FULLSCREEN_PREFIXES = ['/onboarding', '/conteudos/']
+
+/**
+ * Rotas que escondem só a BottomNav (mobile) — os fluxos do M04 (agendamento e detalhe da
+ * sessão) têm barra de ação fixa embaixo no mobile, que colidiria com a navegação. No
+ * desktop elas mantêm o header normalmente: sem isso, o header (visível só em `lg:`) some
+ * junto com a BottomNav, e essas telas ficam sem nenhum "chrome" acima no desktop.
+ */
+export const BOTTOMNAV_HIDDEN_PREFIXES = ['/onboarding', '/conteudos/', '/agendar', '/sessoes/']

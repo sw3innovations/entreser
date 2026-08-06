@@ -54,12 +54,15 @@ export function EscolherTipoView() {
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Agendar"
         title="Escolha o tipo de sessão"
         description="Selecione o atendimento que faz sentido para este momento."
       >
         {minhaFase?.atual && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-pill border border-white/[0.16] bg-white/10 px-3.5 py-1.5">
+          /* `self-start`: no desktop o PlumHero envolve os filhos num flex column, e o
+             `align-items: stretch` padrão esticaria a pill de ponta a ponta. */
+          <div className="mt-4 inline-flex self-start items-center gap-2 rounded-pill border border-white/[0.16] bg-white/10 px-3.5 py-1.5">
             <SparkleIcon size={14} className="text-cream/80" />
             <span className="text-xs text-cream/80">
               Você está na fase <strong className="font-semibold text-cream">{minhaFase.atual.nome}</strong>

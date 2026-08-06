@@ -53,6 +53,7 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Perfil"
         title={dados?.nome ?? 'Profissional'}
         description={dados?.abordagem ?? undefined}

@@ -40,6 +40,7 @@ export function GruposView({ tipo }: { tipo: TipoSessao }) {
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Agendar"
         title="Sessões em grupo"
         description="Encontros com tema definido, para atravessar junto com outras pessoas."

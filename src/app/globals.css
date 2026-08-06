@@ -256,6 +256,19 @@
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
   }
+
+  /* Tela de sucesso (agendamento/reagendamento confirmado) — a entrada é o que
+     transforma "mais uma tela" no MOMENTO de alívio depois de marcar. Tudo
+     one-shot: nada fica pulsando na tela depois que assenta. */
+  .animate-es-selo {
+    animation: es-selo 620ms cubic-bezier(0.34, 1.32, 0.64, 1) both;
+  }
+  .animate-es-halo {
+    animation: es-halo 1150ms ease-out both;
+  }
+  .animate-es-subir {
+    animation: es-subir 520ms ease-out both;
+  }
 }
 
 @keyframes shimmer {
@@ -275,6 +288,33 @@
 @keyframes es-toast-in {
   from { opacity: 0; transform: translate(-50%, 24px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Selo de sucesso: entra "assentando" (leve overshoot), com um halo que se abre
+   uma única vez e some. */
+@keyframes es-selo {
+  from { opacity: 0; transform: scale(0.72); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes es-halo {
+  from { opacity: 0.45; transform: scale(0.75); }
+  to   { opacity: 0; transform: scale(1.85); }
+}
+@keyframes es-subir {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Quem pediu menos movimento vê a tela já assentada — sem entrada, sem halo. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-es-selo,
+  .animate-es-halo,
+  .animate-es-subir {
+    animation: none;
+  }
+  .animate-es-halo {
+    opacity: 0;
+  }
 }
 
 

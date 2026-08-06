@@ -17,17 +17,9 @@ import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
-import { dataHoraPorExtenso, hora } from '@/features/m04/lib/datas'
+import { blocoData, dataHoraPorExtenso, hora } from '@/features/m04/lib/datas'
 import { iconeDoTipo } from '@/features/m04/lib/tipo-icone'
 import type { components } from '@/features/m04/api/schema'
-
-/** "TER" / "11" / "AGO" — bloco de data em estilo cartão, ao lado da hora em destaque. */
-function blocoData(iso: string) {
-  const d = new Date(iso)
-  const dia = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
-  const mes = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
-  return { dia, numero: d.getDate(), mes }
-}
 
 type TipoSessao = components['schemas']['TipoSessao']
 type ProfissionalDetalhe = components['schemas']['ProfissionalDetalhe']
@@ -95,7 +87,7 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
         setErro(mensagemDe(code))
         return
       }
-      if (data) router.push(`/sessoes/${data.id}`)
+      if (data) router.replace(`/sessoes/${data.id}/confirmado?ctx=agendamento`)
     } catch {
       setErro(mensagemDe())
     } finally {
@@ -114,6 +106,7 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
       <PageHero
         width="md"
         topBar={topBar}
+        topBarClassName="lg:hidden"
         eyebrow="Confirmar"
         title="Tudo certo?"
         description="Confira os detalhes antes de marcar."
