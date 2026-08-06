@@ -8,7 +8,7 @@ import {
   request,
   setAccessToken,
 } from '@/lib/http'
-import { podeEntrarNoBackoffice, perfilBackoffice, perfilFromRoles, planoFromApi, statusFromApi } from '@/lib/api/enums'
+import { podeEntrarNoApp, podeEntrarNoBackoffice, perfilBackoffice, perfilFromRoles, planoFromApi, statusFromApi } from '@/lib/api/enums'
 import type { LoginResponse } from '@/lib/api/types'
 import { AuthError } from '../lib/errors'
 import { apenasDigitos } from '../schemas/auth.schema'
@@ -154,6 +154,12 @@ export class ApiAuthService implements AuthService {
     } catch (erro) {
       throw toAuthError(erro, 'login')
     }
+    // Cada perfil entra só pela sua porta (espelho do `adminSignIn`): profissional/admin usam
+    // o `/admin`, não esta tela. Erro genérico — não revela que a conta existe noutro perfil.
+    // A checagem vem ANTES de fixar o token, então uma conta rejeitada nem chega a autenticar.
+    if (!podeEntrarNoApp(login.roles)) {
+      throw new AuthError('CREDENCIAIS_INVALIDAS')
+    }
     setAccessToken(login.accessToken)
     // TODO(backend): exigirTrocaSenha para paciente ainda não tem tela dedicada
     // (só o admin trata). Por ora, segue com a sessão válida emitida pelo backend.
@@ -247,7 +253,9 @@ export class ApiAuthService implements AuthService {
   // ── sessão ──────────────────────────────────────────────────────
   async getSession(): Promise<Session | null> {
     const login = await refreshSession()
-    if (!login || !login.roles.includes('PACIENTE')) return null
+    // Mesma regra do `signIn`: só paciente puro reidrata sessão do app. Um profissional/admin
+    // (mesmo com PACIENTE) não volta a esta frente num reload — usa o `/admin`.
+    if (!login || !podeEntrarNoApp(login.roles)) return null
     const user = this.buildUsuaria(login)
     return { user, accessToken: login.accessToken, expiresAt: this.expiresAt() }
   }

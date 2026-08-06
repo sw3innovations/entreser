@@ -62,6 +62,16 @@ export function podeEntrarNoBackoffice(roles: readonly string[]): boolean {
 }
 
 /**
+ * Quem pode ENTRAR no app da Usuária: só quem é paciente e NÃO é backoffice. Espelho
+ * estrito de `podeEntrarNoBackoffice` — cada perfil entra só pela sua porta. Uma conta que
+ * também seja Profissional/Admin usa o `/admin`, nunca esta frente (mesmo tendo PACIENTE);
+ * sem essa exclusão, o `/auth/login` unificado deixaria um profissional entrar como usuária.
+ */
+export function podeEntrarNoApp(roles: readonly string[]): boolean {
+  return roles.includes('PACIENTE') && !podeEntrarNoBackoffice(roles)
+}
+
+/**
  * É Admin Geral — a checagem para o que é EXCLUSIVO da equipe (usuárias, conteúdos,
  * profissionais, métricas). Não confundir com `podeEntrarNoBackoffice`: uma profissional
  * entra no backoffice sem ser admin.

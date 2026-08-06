@@ -21,16 +21,21 @@ import { NavHistoryProvider } from '@/features/usuaria/shell/nav-history'
  * `UsuariaShell` (fundo + BottomNav do M05). Espelha `admin/(protected)/layout`.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth()
+  const { user, status } = useAuth()
   const router = useRouter()
 
+  // Cada perfil só na sua frente: além de exigir sessão, esta casca só admite Usuária.
+  // O serviço já rejeita profissional/admin no login e na reidratação; aqui é defesa em
+  // profundidade — uma sessão de outro perfil que chegue por qualquer caminho volta ao login.
+  const perfilInvalido = status === 'authenticated' && user != null && user.perfil !== 'Usuaria'
+
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (status === 'unauthenticated' || perfilInvalido) {
       router.replace('/login')
     }
-  }, [status, router])
+  }, [status, perfilInvalido, router])
 
-  if (status !== 'authenticated') {
+  if (status !== 'authenticated' || perfilInvalido) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas text-sm text-mauve">
         Carregando…
