@@ -53,12 +53,16 @@ export function MinhasSessoesView() {
     useListaPaginada<SessaoResumo>(
       (page) => {
         const agora = new Date().toISOString()
+        const anteriores = filtro.periodo === 'anteriores'
         return m04.GET('/usuaria/sessoes', {
           params: {
             query: {
               status: filtro.status,
               de: filtro.periodo === 'proximas' ? agora : undefined,
-              ate: filtro.periodo === 'anteriores' ? agora : undefined,
+              ate: anteriores ? agora : undefined,
+              // No histórico, a mais recente primeiro: é a que ela lembra e provavelmente
+              // procura. Nas próximas, a mais perto de acontecer.
+              ordem: anteriores ? 'desc' : 'asc',
               page,
               size: 20,
             },

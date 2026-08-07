@@ -73,20 +73,22 @@ function janela(periodo: ChavePeriodo) {
   return {
     de: `${emDiasISO(f.dePeriodo)}T00:00:00Z`,
     ate: `${emDiasISO(f.atePeriodo)}T23:59:59Z`,
+    // Em "Anteriores" o topo tem de ser o mais recente — é o que ela acabou de atender e
+    // provavelmente ainda precisa registrar. Nas outras, o mais próximo primeiro.
+    ordem: f.chave === 'anteriores' ? ('desc' as const) : ('asc' as const),
   }
 }
 
 /**
- * Agrupa por dia no fuso local (a agenda é lida como "o meu dia", não como UTC) e ordena
- * por data — dias entre si e sessões dentro do dia.
+ * Agrupa por dia no fuso local (a agenda é lida como "o meu dia", não como UTC),
+ * **preservando a ordem em que o servidor mandou**.
  *
- * A ordenação é feita AQUI porque `GET /profissional/agenda` não a garante: na prática ele
- * devolve fora de ordem (observado: 7/ago, depois 11/ago, depois 10/ago). Numa agenda isso
- * é grave duas vezes — a leitura fica sem sentido, e como a paginação segue a ordem do
- * servidor, "página 1" deixa de ser "as 20 mais próximas" e vira 20 quaisquer.
+ * Não reordena de propósito. Havia aqui um `sort` ascendente, de quando
+ * `GET /profissional/agenda` não garantia ordem (observado: 7/ago, depois 11/ago, depois
+ * 10/ago). Hoje ele ordena, e o cliente aceita `ordem=asc|desc` — reordenar aqui anularia
+ * o `desc` de "Anteriores", deixando o parâmetro sem efeito visível.
  *
- * Ordenar no cliente conserta o que está carregado; a ordem entre PÁGINAS continua sendo do
- * servidor. O ideal é ele ordenar (ver TASKS_BACKEND_M04.md).
+ * O `Map` mantém a ordem de inserção, então dias e sessões saem como chegaram.
  */
 function porDia(itens: SessaoResumo[]) {
   const mapa = new Map<string, SessaoResumo[]>()
@@ -96,12 +98,7 @@ function porDia(itens: SessaoResumo[]) {
     if (atual) atual.push(s)
     else mapa.set(k, [s])
   }
-  return [...mapa.entries()]
-    .map(([chave, sessoes]) => ({
-      chave,
-      sessoes: [...sessoes].sort((a, b) => a.dataHora.localeCompare(b.dataHora)),
-    }))
-    .sort((a, b) => a.chave.localeCompare(b.chave))
+  return [...mapa.entries()].map(([chave, sessoes]) => ({ chave, sessoes }))
 }
 
 /** Cor de destaque por status — usada no risco lateral dos cards e nos blocos da grade semanal. */
@@ -189,7 +186,7 @@ export function AgendaView() {
   const nomeDoTipo = (codigo: SessaoResumo['tipo']) =>
     catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
-  const { de, ate } = janela(periodo)
+  const { de, ate, ordem } = janela(periodo)
   const { dados, carregando, erro, recarregar } = useRecurso(
     () =>
       m04.GET('/profissional/agenda', {
@@ -197,6 +194,7 @@ export function AgendaView() {
           query: {
             de,
             ate,
+            ordem,
             page: pagina,
             size: 20,
             ...(pendencia === 'registro' ? { pendenteRegistro: true } : {}),
@@ -209,9 +207,10 @@ export function AgendaView() {
     [pendencia, periodo, filtroStatus.chave, filtroTipo, pagina],
   )
 
-  // Página 0 substitui; as seguintes acumulam (mesma ideia do "Ver mais" das listas),
-  // deduplicando por `id`: sem ordenação estável no servidor a mesma sessão pode voltar em
-  // duas páginas, o que rendia "duplicate key" no React e cards repetidos na tela.
+  // Página 0 substitui; as seguintes acumulam (mesma ideia do "Ver mais" das listas). A
+  // dedup por `id` ficou como rede: nasceu de o servidor não ordenar (a mesma sessão voltava
+  // em duas páginas, rendendo "duplicate key" no React), o que já foi corrigido — mas é
+  // barata e protege de qualquer instabilidade de paginação sem custo perceptível.
   const itens = pagina === 0 ? (dados?.content ?? []) : juntarSemRepetir(acumulado, dados?.content ?? [])
   const dias = porDia(itens)
   const vazio = !carregando && !erro && itens.length === 0
@@ -435,14 +434,15 @@ export function AgendaView() {
           nota="já aconteceram"
           cor="text-mauve"
         />
-        {/* "canceladas", não "canceladas pelas usuárias": o `/resumo` devolve o total do
-            período sem separar quem cancelou. O `canceladaPor` do `SessaoResumo` permite a
-            distinção item a item, mas só sobre a página carregada — e voltar a baixar o
-            período inteiro para refinar um rótulo desfaria o ganho deste endpoint. */}
+        {/* `canceladasPelaUsuaria14Dias`, não o total: o card quer dizer "desmarcaram
+            comigo", e `canceladas14Dias` soma também o que a própria profissional cancelou —
+            atribuindo a ela o que ela mesma decidiu. As duas contam pela data do
+            CANCELAMENTO, não pela da sessão: um cancelamento de hoje para uma sessão do mês
+            que vem é a notícia mais acionável, e era exatamente a que faltava. */}
         <Metrica
           rotulo="Últimos 14 dias"
-          valor={String(resumo?.canceladas14Dias ?? '—')}
-          nota="canceladas"
+          valor={String(resumo?.canceladasPelaUsuaria14Dias ?? '—')}
+          nota="canceladas pelas usuárias"
         />
         <Metrica rotulo="Previsto no mês" valor={reais(previstoNoMes) ?? 'R$ 0,00'} nota="sessões agendadas e realizadas" />
       </div>
