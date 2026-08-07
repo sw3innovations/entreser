@@ -503,6 +503,10 @@ export interface paths {
         /**
          * Lista as sessões da usuária autenticada
          * @description Inclui sessões individuais, de casal e inscrições em grupo.
+         *
+         *     **Sessões de grupo das quais ela saiu ficam de fora por padrão** — "Minhas sessões"
+         *     significa "as minhas". Para o histórico ("Anteriores"), `incluirSaidas=true` traz
+         *     de volta o que ela já frequentou e depois deixou.
          */
         get: operations["listarMinhasSessoes"];
         put?: never;
@@ -808,23 +812,43 @@ export interface components {
          */
         ResumoAgenda: {
             /**
-             * @description Sessões ativas (`Agendada`/`Confirmada`) de hoje até +7 dias.
+             * @description Sessões `Agendada`/`Confirmada` com `dataHora` entre **agora** e agora+7 dias
+             *     (rolante — não do início do dia).
              * @example 6
              */
             proximos7Dias: number;
             /**
-             * @description Sessões `Cancelada` nos últimos 14 dias.
+             * @description Canceladas cuja **`canceladaEm`** caiu nos últimos 14 dias — pela data do
+             *     cancelamento, não pela da sessão. Um cancelamento feito hoje para uma sessão do
+             *     mês que vem entra aqui; uma sessão da semana passada cancelada há meses, não.
+             *
+             *     Cancelamentos sem `canceladaEm` (dado antigo) ficam de fora: não se sabe quando
+             *     foram.
              * @example 3
              */
             canceladas14Dias: number;
             /**
-             * @description Sessões que já aconteceram e seguem sem registro. Mesma definição do
-             *     `pendenteRegistro` do `SessaoResumo`, agregada.
+             * @description Subconjunto de `canceladas14Dias` com `canceladaPor = Usuaria` — exclui o que a
+             *     própria profissional cancelou.
+             *
+             *     **É este que responde "desmarcaram comigo".** O total sozinho soma também as
+             *     decisões dela, atribuindo a ela o que ela mesma fez.
+             * @example 2
+             */
+            canceladasPelaUsuaria14Dias: number;
+            /**
+             * @description Sessões ativas cuja `dataHora` já passou e que seguem sem registro. **Sem piso
+             *     inferior**: uma pendência de registro é acionável para sempre, e limitar a
+             *     janela faria a mais antiga sumir justamente por ter sido esquecida por tempo
+             *     demais.
              * @example 0
              */
             pendenteRegistro: number;
             /**
-             * @description Sessões com `linkMeetStatus = Falhou`, aguardando link manual.
+             * @description Sessões com `linkMeetStatus = Falhou`, aguardando link manual, com `dataHora`
+             *     entre −14 e +90 dias. **Mantém a janela de propósito** (ao contrário de
+             *     `pendenteRegistro`): uma sala que falhou numa sessão já ocorrida não tem mais o
+             *     que resolver.
              * @example 0
              */
             linkMeetFalhou: number;
@@ -1575,6 +1599,15 @@ export interface components {
         /** @description Página, começando em zero. */
         Page: number;
         Size: number;
+        /**
+         * @description Ordem por `dataHora`. `asc` (padrão) para listas do futuro; `desc` para as abas
+         *     "Anteriores", onde o topo deve ser o mais recente — sem isso, quanto mais histórico
+         *     a conta acumula, mais para baixo (ou para a última página) vai o que interessa.
+         *
+         *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
+         *     quem consulta uma janela que cruza o presente.
+         */
+        Ordem: "asc" | "desc";
     };
     requestBodies: never;
     headers: never;
@@ -1819,6 +1852,15 @@ export interface operations {
                 /** @description Página, começando em zero. */
                 page?: components["parameters"]["Page"];
                 size?: components["parameters"]["Size"];
+                /**
+                 * @description Ordem por `dataHora`. `asc` (padrão) para listas do futuro; `desc` para as abas
+                 *     "Anteriores", onde o topo deve ser o mais recente — sem isso, quanto mais histórico
+                 *     a conta acumula, mais para baixo (ou para a última página) vai o que interessa.
+                 *
+                 *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
+                 *     quem consulta uma janela que cruza o presente.
+                 */
+                ordem?: components["parameters"]["Ordem"];
             };
             header?: never;
             path?: never;
@@ -2399,9 +2441,24 @@ export interface operations {
                 status?: components["schemas"]["StatusSessao"][];
                 de?: string;
                 ate?: string;
+                /**
+                 * @description `true` inclui sessões de grupo com `saiuEm` preenchido — as que ela abandonou.
+                 *     Só faz sentido em listagens de passado: em "Próximas", uma sessão da qual ela
+                 *     saiu não é dela.
+                 */
+                incluirSaidas?: boolean;
                 /** @description Página, começando em zero. */
                 page?: components["parameters"]["Page"];
                 size?: components["parameters"]["Size"];
+                /**
+                 * @description Ordem por `dataHora`. `asc` (padrão) para listas do futuro; `desc` para as abas
+                 *     "Anteriores", onde o topo deve ser o mais recente — sem isso, quanto mais histórico
+                 *     a conta acumula, mais para baixo (ou para a última página) vai o que interessa.
+                 *
+                 *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
+                 *     quem consulta uma janela que cruza o presente.
+                 */
+                ordem?: components["parameters"]["Ordem"];
             };
             header?: never;
             path?: never;

@@ -291,6 +291,7 @@ paths:
           explode: false
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Ordem'
       responses:
         '200':
           description: |
@@ -816,7 +817,12 @@ paths:
       tags: [usuaria-sessoes]
       operationId: listarMinhasSessoes
       summary: Lista as sessões da usuária autenticada
-      description: Inclui sessões individuais, de casal e inscrições em grupo.
+      description: |
+        Inclui sessões individuais, de casal e inscrições em grupo.
+
+        **Sessões de grupo das quais ela saiu ficam de fora por padrão** — "Minhas sessões"
+        significa "as minhas". Para o histórico ("Anteriores"), `incluirSaidas=true` traz
+        de volta o que ela já frequentou e depois deixou.
       parameters:
         - name: status
           in: query
@@ -834,8 +840,17 @@ paths:
           in: query
           required: false
           schema: { type: string, format: date-time }
+        - name: incluirSaidas
+          in: query
+          required: false
+          description: |
+            `true` inclui sessões de grupo com `saiuEm` preenchido — as que ela abandonou.
+            Só faz sentido em listagens de passado: em "Próximas", uma sessão da qual ela
+            saiu não é dela.
+          schema: { type: boolean, default: false }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Ordem'
       responses:
         '200':
           description: Sessões da usuária
@@ -1124,6 +1139,18 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Ordem:
+      name: ordem
+      in: query
+      required: false
+      description: |
+        Ordem por `dataHora`. `asc` (padrão) para listas do futuro; `desc` para as abas
+        "Anteriores", onde o topo deve ser o mais recente — sem isso, quanto mais histórico
+        a conta acumula, mais para baixo (ou para a última página) vai o que interessa.
+
+        Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
+        quem consulta uma janela que cruza o presente.
+      schema: { type: string, enum: [asc, desc], default: asc }
 
   responses:
     Erro400:
@@ -1303,26 +1330,49 @@ components:
         As cinco contagens do topo da agenda (PF5), cada uma com o seu próprio recorte
         de tempo — por isso um objeto só, e não um número por requisição.
       required:
-        [proximos7Dias, canceladas14Dias, pendenteRegistro, linkMeetFalhou,
-         receitaPrevistaMes]
+        [proximos7Dias, canceladas14Dias, canceladasPelaUsuaria14Dias, pendenteRegistro,
+         linkMeetFalhou, receitaPrevistaMes]
       properties:
         proximos7Dias:
           type: integer
-          description: Sessões ativas (`Agendada`/`Confirmada`) de hoje até +7 dias.
+          description: |
+            Sessões `Agendada`/`Confirmada` com `dataHora` entre **agora** e agora+7 dias
+            (rolante — não do início do dia).
           example: 6
         canceladas14Dias:
           type: integer
-          description: Sessões `Cancelada` nos últimos 14 dias.
+          description: |
+            Canceladas cuja **`canceladaEm`** caiu nos últimos 14 dias — pela data do
+            cancelamento, não pela da sessão. Um cancelamento feito hoje para uma sessão do
+            mês que vem entra aqui; uma sessão da semana passada cancelada há meses, não.
+
+            Cancelamentos sem `canceladaEm` (dado antigo) ficam de fora: não se sabe quando
+            foram.
           example: 3
+        canceladasPelaUsuaria14Dias:
+          type: integer
+          description: |
+            Subconjunto de `canceladas14Dias` com `canceladaPor = Usuaria` — exclui o que a
+            própria profissional cancelou.
+
+            **É este que responde "desmarcaram comigo".** O total sozinho soma também as
+            decisões dela, atribuindo a ela o que ela mesma fez.
+          example: 2
         pendenteRegistro:
           type: integer
           description: |
-            Sessões que já aconteceram e seguem sem registro. Mesma definição do
-            `pendenteRegistro` do `SessaoResumo`, agregada.
+            Sessões ativas cuja `dataHora` já passou e que seguem sem registro. **Sem piso
+            inferior**: uma pendência de registro é acionável para sempre, e limitar a
+            janela faria a mais antiga sumir justamente por ter sido esquecida por tempo
+            demais.
           example: 0
         linkMeetFalhou:
           type: integer
-          description: Sessões com `linkMeetStatus = Falhou`, aguardando link manual.
+          description: |
+            Sessões com `linkMeetStatus = Falhou`, aguardando link manual, com `dataHora`
+            entre −14 e +90 dias. **Mantém a janela de propósito** (ao contrário de
+            `pendenteRegistro`): uma sala que falhou numa sessão já ocorrida não tem mais o
+            que resolver.
           example: 0
         receitaPrevistaMes:
           type: number
