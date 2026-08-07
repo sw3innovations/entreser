@@ -85,6 +85,26 @@ export interface DateInputProps extends CampoTemporalProps {
   abrirEm?: string
 }
 
+export interface DateRangeInputProps {
+  label?: string
+  /** Início e fim, cada um `YYYY-MM-DD` — independentes de propósito (ver comentário
+   * no componente: um intervalo "de verdade" perde o valor já digitado de um lado
+   * enquanto o outro está incompleto). */
+  valueStart?: string
+  valueEnd?: string
+  onChangeStart?: (value: string) => void
+  onChangeEnd?: (value: string) => void
+  /** Data mínima de cada ponta (`YYYY-MM-DD`) — tipicamente hoje na primeira e
+   * `valueStart` na segunda, para não deixar digitar um fim antes do início. */
+  minStart?: string
+  minEnd?: string
+  errorMessage?: string
+  isDisabled?: boolean
+  hint?: string
+  tema?: TemaCampo
+  className?: string
+}
+
 export type TimeInputProps = CampoTemporalProps
 
 /** ISO (`YYYY-MM-DD`) → DateValue, tolerando vazio/incompleto. */
@@ -230,6 +250,88 @@ export function DateInput({
           </Calendar>
         </DatePicker.Popover>
       </DatePicker>
+    </I18nProvider>
+  )
+}
+
+/**
+ * DateRangeInput — início e fim num único campo visual, para os poucos lugares (hoje só
+ * "Bloquear datas") que já têm uma grade de calendário própria ao lado: dois `DatePicker`
+ * independentes (mesmo modelo de estado do `DateInput`, sem juntar num `RangeValue` só)
+ * compartilhando uma borda, sem gatilho de calendário nem popover — a grade acima já cobre
+ * a escolha visual, então duplicar um segundo calendário aqui só confundiria.
+ */
+export function DateRangeInput({
+  label,
+  valueStart,
+  valueEnd,
+  onChangeStart,
+  onChangeEnd,
+  minStart,
+  minEnd,
+  errorMessage,
+  isDisabled,
+  hint,
+  tema = 'claro',
+  className,
+}: DateRangeInputProps) {
+  const pele = PELES[tema]
+
+  return (
+    <I18nProvider locale="pt-BR">
+      <div className={cn('flex w-full flex-col gap-1.5', className)}>
+        {label && <Label className={pele.label}>{label}</Label>}
+
+        <div
+          className={cn(
+            pele.grupo,
+            errorMessage ? pele.bordaErro : pele.bordaNormal,
+            isDisabled && 'opacity-50',
+          )}
+        >
+          <span className={pele.prefixo}>
+            <AgendaIcon size={16} />
+          </span>
+
+          <DatePicker
+            aria-label={label ? `${label} — início` : 'Início'}
+            value={isoParaData(valueStart)}
+            onChange={(date) => onChangeStart?.(date ? date.toString() : '')}
+            minValue={isoParaData(minStart) ?? undefined}
+            isInvalid={Boolean(errorMessage)}
+            isDisabled={isDisabled}
+            shouldForceLeadingZeros
+          >
+            <DateField.Input className={pele.segmentos}>
+              {(segment) => <DateField.Segment segment={segment} className={pele.segmento} />}
+            </DateField.Input>
+          </DatePicker>
+
+          <span aria-hidden className={cn('shrink-0', pele.prefixo)}>
+            →
+          </span>
+
+          <DatePicker
+            aria-label={label ? `${label} — fim` : 'Fim'}
+            value={isoParaData(valueEnd)}
+            onChange={(date) => onChangeEnd?.(date ? date.toString() : '')}
+            minValue={isoParaData(minEnd) ?? undefined}
+            isInvalid={Boolean(errorMessage)}
+            isDisabled={isDisabled}
+            shouldForceLeadingZeros
+          >
+            <DateField.Input className={pele.segmentos}>
+              {(segment) => <DateField.Segment segment={segment} className={pele.segmento} />}
+            </DateField.Input>
+          </DatePicker>
+        </div>
+
+        {errorMessage ? (
+          <FieldError className={pele.erro}>{errorMessage}</FieldError>
+        ) : (
+          <Auxiliar hint={hint} pele={pele} />
+        )}
+      </div>
     </I18nProvider>
   )
 }

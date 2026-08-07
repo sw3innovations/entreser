@@ -22,8 +22,10 @@ export { PhoneInput, maskPhoneBR, type PhoneInputProps } from './phone-input'
 export { MoneyInput, formatCentavos, type MoneyInputProps } from './money-input'
 export {
   DateInput,
+  DateRangeInput,
   TimeInput,
   type DateInputProps,
+  type DateRangeInputProps,
   type TimeInputProps,
   type TemaCampo,
 } from './date-input'
