@@ -132,6 +132,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profissional/agenda/resumo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contagens do painel da agenda, agregadas no servidor
+         * @description As cinco métricas do topo de PF5, prontas. **Não aceita parâmetros**: os recortes
+         *     de cada uma são fixos e definidos no servidor (ver a descrição de cada campo).
+         *
+         *     **Existe para o painel não ser montado com uma requisição por número.** Antes,
+         *     a tela disparava quatro `GET /profissional/agenda` com `size=1` só para ler os
+         *     totais do envelope, e uma quinta com `size=100` para somar a receita no cliente —
+         *     a única parte da tela que supunha um volume máximo de sessões. Aqui a soma é do
+         *     servidor, que é quem sabe o total de verdade.
+         */
+        get: operations["resumoAgenda"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profissional/sessoes/grupo": {
         parameters: {
             query?: never;
@@ -775,6 +802,41 @@ export interface components {
              */
             totalLinkMeetFalhou: number;
         };
+        /**
+         * @description As cinco contagens do topo da agenda (PF5), cada uma com o seu próprio recorte
+         *     de tempo — por isso um objeto só, e não um número por requisição.
+         */
+        ResumoAgenda: {
+            /**
+             * @description Sessões ativas (`Agendada`/`Confirmada`) de hoje até +7 dias.
+             * @example 6
+             */
+            proximos7Dias: number;
+            /**
+             * @description Sessões `Cancelada` nos últimos 14 dias.
+             * @example 3
+             */
+            canceladas14Dias: number;
+            /**
+             * @description Sessões que já aconteceram e seguem sem registro. Mesma definição do
+             *     `pendenteRegistro` do `SessaoResumo`, agregada.
+             * @example 0
+             */
+            pendenteRegistro: number;
+            /**
+             * @description Sessões com `linkMeetStatus = Falhou`, aguardando link manual.
+             * @example 0
+             */
+            linkMeetFalhou: number;
+            /**
+             * Format: double
+             * @description Soma de `valorPraticado` das sessões agendadas e realizadas do mês corrente.
+             *     Somado no servidor: no cliente, dependia de baixar uma página de até 100
+             *     itens e supor que cabia tudo nela.
+             * @example 830
+             */
+            receitaPrevistaMes: number;
+        };
         PaginaProfissionais: components["schemas"]["Pagina"] & {
             content: components["schemas"]["ProfissionalResumo"][];
         };
@@ -1200,6 +1262,17 @@ export interface components {
              * @example Ana Souza
              */
             participanteNome?: string | null;
+            /**
+             * @description Quem cancelou, quando `status` é `Cancelada`; nulo nos demais status.
+             *
+             *     **Existe para a agenda separar cancelamento da usuária do da própria
+             *     profissional.** A métrica "canceladas nos últimos 14 dias" quer dizer
+             *     "desmarcaram comigo" — sem este campo ela somava também os cancelamentos
+             *     que a profissional fez, atribuindo a ela mesma o que ela decidiu. Só existia
+             *     em `Sessao` (o detalhe), e buscar o detalhe de cada item da listagem para
+             *     contar seria N requisições por página.
+             */
+            canceladaPor?: components["schemas"]["CanceladoPor"] | null;
         };
         /**
          * @description Detalhe público de uma sessão de grupo aberta a inscrições — a tela que precede
@@ -1768,6 +1841,28 @@ export interface operations {
                 };
             };
             400: components["responses"]["Erro400"];
+            401: components["responses"]["Erro401"];
+            403: components["responses"]["Erro403"];
+        };
+    };
+    resumoAgenda: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contagens do período corrente. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumoAgenda"];
+                };
+            };
             401: components["responses"]["Erro401"];
             403: components["responses"]["Erro403"];
         };

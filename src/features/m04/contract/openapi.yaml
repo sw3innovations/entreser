@@ -305,6 +305,29 @@ paths:
         '401': { $ref: '#/components/responses/Erro401' }
         '403': { $ref: '#/components/responses/Erro403' }
 
+  /profissional/agenda/resumo:
+    get:
+      tags: [profissional-sessoes]
+      operationId: resumoAgenda
+      summary: Contagens do painel da agenda, agregadas no servidor
+      description: |
+        As cinco métricas do topo de PF5, prontas. **Não aceita parâmetros**: os recortes
+        de cada uma são fixos e definidos no servidor (ver a descrição de cada campo).
+
+        **Existe para o painel não ser montado com uma requisição por número.** Antes,
+        a tela disparava quatro `GET /profissional/agenda` com `size=1` só para ler os
+        totais do envelope, e uma quinta com `size=100` para somar a receita no cliente —
+        a única parte da tela que supunha um volume máximo de sessões. Aqui a soma é do
+        servidor, que é quem sabe o total de verdade.
+      responses:
+        '200':
+          description: Contagens do período corrente.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResumoAgenda' }
+        '401': { $ref: '#/components/responses/Erro401' }
+        '403': { $ref: '#/components/responses/Erro403' }
+
   /profissional/sessoes/grupo:
     post:
       tags: [profissional-sessoes]
@@ -1274,6 +1297,42 @@ components:
               description: Sessões do período com `linkMeetStatus = Falhou`.
               example: 1
 
+    ResumoAgenda:
+      type: object
+      description: |
+        As cinco contagens do topo da agenda (PF5), cada uma com o seu próprio recorte
+        de tempo — por isso um objeto só, e não um número por requisição.
+      required:
+        [proximos7Dias, canceladas14Dias, pendenteRegistro, linkMeetFalhou,
+         receitaPrevistaMes]
+      properties:
+        proximos7Dias:
+          type: integer
+          description: Sessões ativas (`Agendada`/`Confirmada`) de hoje até +7 dias.
+          example: 6
+        canceladas14Dias:
+          type: integer
+          description: Sessões `Cancelada` nos últimos 14 dias.
+          example: 3
+        pendenteRegistro:
+          type: integer
+          description: |
+            Sessões que já aconteceram e seguem sem registro. Mesma definição do
+            `pendenteRegistro` do `SessaoResumo`, agregada.
+          example: 0
+        linkMeetFalhou:
+          type: integer
+          description: Sessões com `linkMeetStatus = Falhou`, aguardando link manual.
+          example: 0
+        receitaPrevistaMes:
+          type: number
+          format: double
+          description: |
+            Soma de `valorPraticado` das sessões agendadas e realizadas do mês corrente.
+            Somado no servidor: no cliente, dependia de baixar uma página de até 100
+            itens e supor que cabia tudo nela.
+          example: 830
+
     PaginaProfissionais:
       allOf:
         - $ref: '#/components/schemas/Pagina'
@@ -1659,6 +1718,18 @@ components:
             dizer quem. Espelha `pendenteRegistro`/`jaInscrita`: opcional, preenchido
             por contexto, nunca calculado no cliente.
           example: Ana Souza
+        canceladaPor:
+          allOf: [{ $ref: '#/components/schemas/CanceladoPor' }]
+          nullable: true
+          description: |
+            Quem cancelou, quando `status` é `Cancelada`; nulo nos demais status.
+
+            **Existe para a agenda separar cancelamento da usuária do da própria
+            profissional.** A métrica "canceladas nos últimos 14 dias" quer dizer
+            "desmarcaram comigo" — sem este campo ela somava também os cancelamentos
+            que a profissional fez, atribuindo a ela mesma o que ela decidiu. Só existia
+            em `Sessao` (o detalhe), e buscar o detalhe de cada item da listagem para
+            contar seria N requisições por página.
 
     SessaoGrupoPublica:
       type: object
