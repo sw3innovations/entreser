@@ -39,9 +39,42 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
     [profissionalId],
   )
   const { catalogo } = useCatalogoTipos()
-  const nomeDoTipo = (codigo: TipoSessao) => catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
+  const infoDoTipo = (codigo: TipoSessao) => catalogo?.tipos.find((t) => t.codigo === codigo)
+  const nomeDoTipo = (codigo: TipoSessao) => infoDoTipo(codigo)?.nome ?? codigo
 
-  const valor = dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipoSelecionado)?.valor ?? null
+  /**
+   * Só os tipos que ESTE fluxo aceita. Esta rota é a do atendimento individual — grupo tem
+   * rota própria (`/agendar/grupo/{tipo}`), com inscrição em vez de marcação.
+   *
+   * Sem o recorte por categoria, um tipo de grupo aparecia aqui e a pessoa seguia até o fim:
+   * escolhia data e hora e só o `POST /sessoes` recusava, com `TIPO_E_DE_GRUPO`. Pior que
+   * tardio, o aviso é inacionável — ele manda usar o fluxo de grupo, e não há como chegar lá
+   * a partir da confirmação. A categoria já vinha carregada no catálogo; faltava usá-la.
+   *
+   * Enquanto o catálogo não chega não dá para classificar ninguém: melhor não listar do que
+   * listar tudo e tirar itens da tela no instante seguinte.
+   */
+  const ofertas = catalogo
+    ? (dados?.tiposOferecidos ?? []).filter(
+        (o): o is typeof o & { valor: number } =>
+          o.valor != null && infoDoTipo(o.tipoSessao)?.categoria === 'Individual',
+      )
+    : []
+
+  /**
+   * A seleção pode vir inválida pela URL (`/agendar/RodaConversa/{id}`), que ninguém navega
+   * mas todo mundo consegue digitar. Sem esta checagem o botão seguiria para os horários com
+   * um tipo que o servidor vai recusar lá na frente — exatamente o beco que este ajuste veio
+   * fechar.
+   */
+  const selecaoValida = ofertas.some((o) => o.tipoSessao === tipoSelecionado)
+  const semOfertaIndividual = Boolean(catalogo && dados && ofertas.length === 0)
+
+  // Só o preço do que dá para marcar aqui. Com um tipo de grupo na URL, o cabeçalho
+  // estampava o valor dele — um preço real, de um atendimento que esta tela não vende.
+  const valor = selecaoValida
+    ? (dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipoSelecionado)?.valor ?? null)
+    : null
 
   const topBar = (
     <HeroIconButton aria-label="Voltar" onPress={voltar}>
@@ -99,13 +132,19 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
                 )}
               </div>
 
-              {dados.tiposOferecidos && dados.tiposOferecidos.length > 0 && (
+              {semOfertaIndividual && (
+                <p className="rounded-card border border-plum/8 bg-white p-4 text-[13.5px] leading-relaxed text-plum/60 shadow-card">
+                  Esta profissional não oferece atendimento individual no momento — só sessões
+                  em grupo. Você pode procurá-las em <strong className="font-semibold text-plum">Agendar</strong>.
+                </p>
+              )}
+
+              {ofertas.length > 0 && (
                 <div>
                   <p className="text-eyebrow mb-2.5 text-mauve">Tipos de sessão oferecidos</p>
                   <p className="mb-2.5 -mt-1.5 text-[12px] text-plum/45">Toque para trocar o tipo de sessão.</p>
                   <div className="flex flex-col gap-2.5">
-                    {dados.tiposOferecidos
-                      .filter((oferta): oferta is typeof oferta & { valor: number } => oferta.valor != null)
+                    {ofertas
                       .map((oferta) => {
                         const selecionado = oferta.tipoSessao === tipoSelecionado
                         const Icone = iconeDoTipo(oferta.tipoSessao)
@@ -142,13 +181,26 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
       {dados && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-plum/[0.06] bg-[rgba(255,253,250,0.9)] shadow-[0_-6px_24px_rgba(45,24,64,0.08)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-3xl px-[18px] pb-[18px] pt-[14px]">
-            <button
-              type="button"
-              onClick={() => router.push(`/agendar/${tipoSelecionado}/${profissionalId}/horarios`)}
-              className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99]"
-            >
-              Ver horários
-            </button>
+            {/* Sem tipo individual válido não há o que marcar aqui: o caminho é voltar e
+                escolher outra profissional (ou o fluxo de grupo). Deixar o botão ativo só
+                adiaria a recusa para o fim do funil. */}
+            {selecaoValida ? (
+              <button
+                type="button"
+                onClick={() => router.push(`/agendar/${tipoSelecionado}/${profissionalId}/horarios`)}
+                className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-full bg-mauve text-[15px] font-semibold text-cream shadow-[0_8px_22px_rgba(122,74,92,0.32)] transition-es active:scale-[0.99]"
+              >
+                Ver horários
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push('/agendar')}
+                className="flex h-[50px] flex-1 items-center justify-center gap-2 rounded-full border border-mauve/30 bg-white text-[15px] font-semibold text-mauve transition-es active:scale-[0.99]"
+              >
+                Escolher outro atendimento
+              </button>
+            )}
           </div>
         </div>
       )}
