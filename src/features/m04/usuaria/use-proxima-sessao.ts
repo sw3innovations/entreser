@@ -11,14 +11,13 @@ type PaginaSessoes = { content: SessaoResumo[] }
  * A próxima sessão da usuária — a informação mais acionável da home ("quando é a minha
  * próxima?"), que antes exigia entrar em Minhas Sessões para descobrir.
  *
- * Busca UMA página de sessões futuras ativas e escolhe a mais próxima **no cliente**:
- * `GET /usuaria/sessoes` não documenta ordenação e, na prática, devolve fora de ordem
- * (observado: 11/ago 19:30 antes de 11/ago 16:00 e de 10/ago). Por isso não dá para pedir
- * `size=1` e confiar no primeiro item — seria a "próxima" errada.
+ * Pede **um item só**: com `ordem=asc` a partir de agora, o primeiro da lista É a próxima.
  *
- * Suposição explícita: 50 sessões futuras cobrem qualquer usuária real nesta fase, então
- * não paginamos. Se alguém passar disso, a próxima ainda estará nesta página (o corte é
- * por volume, não por data) — mas fica registrado que o limite existe.
+ * Já foi `size=50` com a escolha da menor data no cliente, de quando `GET /usuaria/sessoes`
+ * devolvia fora de ordem (observado: 11/ago 19:30 antes de 11/ago 16:00). Aquilo baixava 50
+ * registros para renderizar um e carregava uma suposição de volume — "50 futuras cobrem
+ * qualquer usuária" — que ninguém revisitaria, e cujo erro seria silencioso: o card mostraria
+ * uma sessão, só que a errada. O servidor ordenando tirou as duas coisas.
  */
 export function useProximaSessao(enabled = true) {
   const { dados, carregando } = useRecurso<PaginaSessoes>(
@@ -29,8 +28,9 @@ export function useProximaSessao(enabled = true) {
               query: {
                 status: ['Agendada', 'Confirmada'],
                 de: new Date().toISOString(),
+                ordem: 'asc',
                 page: 0,
-                size: 50,
+                size: 1,
               },
             },
           })
@@ -38,10 +38,5 @@ export function useProximaSessao(enabled = true) {
     [enabled],
   )
 
-  const proxima =
-    dados?.content && dados.content.length > 0
-      ? [...dados.content].sort((a, b) => a.dataHora.localeCompare(b.dataHora))[0]
-      : null
-
-  return { proxima, carregando }
+  return { proxima: dados?.content?.[0] ?? null, carregando }
 }

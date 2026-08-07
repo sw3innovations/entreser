@@ -46,10 +46,10 @@ function iniciais(nome: string): string {
  * delete, D7) e vem no próprio payload — não dá para inferir de `vagasDisponiveis`, que
  * volta ao total quando a última pessoa sai e ficaria igual a uma sessão nunca cheia.
  *
- * Existe porque o backend continua devolvendo `podeCancelar: true` depois da saída: sem
- * esta checagem, o botão "Cancelar minha inscrição" segue ativo e o clique bate em
- * `NAO_INSCRITA`. A regra de quem PODE cancelar continua sendo do servidor; aqui só
- * respeitamos um fato que ele mesmo já contou.
+ * **Não decide mais se a ação aparece** — isso é `podeCancelar`, e o backend passou a
+ * devolvê-lo `false` para quem saiu. Serve só para saber o PORQUÊ de não haver ação, que
+ * `podeCancelar: false` sozinho não distingue: uma sessão também fica sem ação quando é
+ * tarde demais para cancelar, e aí "Agendar novamente" seria uma resposta errada.
  */
 function jaSaiuDoGrupo(s: Sessao, usuariaId?: string): boolean {
   if (!usuariaId) return false
@@ -310,9 +310,11 @@ export function SessaoDetalheView({
         </Estado>
       </PageContent>
 
-      {/* Ações — só aparecem quando o backend diz que podem (UF8/UF9), e nunca depois de
-          já ter saído do grupo (o `podeCancelar` continua vindo `true` nesse caso). */}
-      {dados && !saiuDoGrupo && (dados.podeCancelar || dados.podeReagendar) && (
+      {/* Ações — quem decide é o backend (UF8/UF9), ponto. Havia aqui um `!saiuDoGrupo`
+          extra, de quando `podeCancelar` vinha `true` mesmo para quem já tinha saído e o
+          clique batia em `NAO_INSCRITA`; hoje ele vem `false`, e manter o veto seria uma
+          regra de permissão vivendo na tela, contra o princípio desta view. */}
+      {dados && (dados.podeCancelar || dados.podeReagendar) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-plum/[0.06] bg-[rgba(255,253,250,0.9)] shadow-[0_-6px_24px_rgba(45,24,64,0.08)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-3xl items-center gap-[11px] px-[18px] pb-[18px] pt-[14px]">
             {/* Em grupo a saída é DESISTIR da própria inscrição — cancelar encerraria o
@@ -341,7 +343,11 @@ export function SessaoDetalheView({
       )}
 
       {/* Sem mais ação possível — sessão cancelada, ou grupo do qual já saí: convite para
-          marcar de novo, direto no mesmo tipo de sessão. */}
+          marcar de novo, direto no mesmo tipo de sessão.
+
+          Aqui o `saiuDoGrupo` continua sendo necessário, e não é duplicação: `podeCancelar:
+          false` não diz o motivo, e uma sessão perto demais de começar também o tem sem que
+          "Agendar novamente" faça sentido. É o único uso que sobrou. */}
       {dados &&
         (saiuDoGrupo ||
           (dados.status === 'Cancelada' && !dados.podeCancelar && !dados.podeReagendar)) && (
