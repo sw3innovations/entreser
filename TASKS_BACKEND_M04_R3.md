@@ -1,5 +1,27 @@
 # Devolutiva — M04 (Agendamento), 3ª rodada
 
+> ## ✅ Resolvido — verificado em 07/08/2026
+>
+> Entregue no commit `241d05e4` e conferido: **os 5 itens estão fechados**, e o frontend já
+> consome tudo. Nada aqui depende mais do backend.
+>
+> | Item | Como veio | Verificação |
+> |---|---|---|
+> | §1 `jaInscrita` | Opção A, a preferida — reusou o campo existente | `false` na abandonada, `true` nas demais ✅ |
+> | §2.1 Reagendamento | `sendReagendamento` para profissional **e** paciente | Duas notificações ✅ |
+> | §2.2 Convite | `criarConvite` devolve token; `sendConviteParceira` linka `/convite/:token` | ✅ |
+> | §2.3 Casal | Laço sobre as demais participantes ativas no ramo da usuária | ✅ |
+> | §2.4 Saída de grupo | Avisa a profissional | ✅ |
+> | §3 `ordem` | `OrdemSessaoResolver`, ponto único | `ordem=descendente` → **400 `PARAMETRO_INVALIDO`** ✅ |
+>
+> **O `incluirSaidas` finalmente foi ligado** (era o que o §1 bloqueava). O histórico marca
+> a sessão abandonada com o selo "Você saiu" ao lado do status — sem ele o card mostraria
+> "Agendada" e pareceria que ela participou.
+>
+> Fizeram mais do que o pedido em dois pontos: o `ordem` passou a **rejeitar** valor inválido
+> em vez de mascarar (era sugestão sem urgência), e o reagendamento notifica os **dois** lados,
+> não só a profissional.
+
 _Resposta à entrega do commit `0b162765` ("devolutiva 2a rodada M04 — resumo, ordenacao e
 historico"). Verificado em **07/08/2026** por três caminhos: leitura do código, `/v3/api-docs`
 do `dev-api` e chamadas reais com as duas contas (profissional `a6f1f31c-…`, usuária

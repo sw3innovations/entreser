@@ -1262,13 +1262,19 @@ export interface components {
              */
             pendenteRegistro?: boolean | null;
             /**
-             * @description Se a usuária autenticada já está inscrita nesta sessão de grupo.
-             *     Preenchido apenas em `GET /grupos`; nulo nas demais listagens.
+             * @description Se a usuária autenticada tem vínculo ATIVO com esta sessão (participante sem
+             *     `saiuEm`). Preenchido em `GET /grupos` e em `GET /usuaria/sessoes`; nulo nas
+             *     listagens onde não há usuária no contexto (ex.: agenda da profissional).
              *
              *     **Existe para decidir o rótulo do botão sem uma segunda requisição.**
              *     Sem este campo, a lista de grupos precisaria ser cruzada com
              *     `GET /usuaria/sessoes` no cliente para saber se o botão diz
              *     "Inscrever-se" ou "Você já está inscrita".
+             *
+             *     **É também o que distingue uma sessão abandonada** quando
+             *     `incluirSaidas=true`: `status` é da SESSÃO (ela segue `Agendada` para as
+             *     outras participantes), não do vínculo. Sem `jaInscrita`, o histórico mostraria
+             *     um grupo que a usuária largou como se ela tivesse participado.
              * @example false
              */
             jaInscrita?: boolean | null;
@@ -1606,6 +1612,9 @@ export interface components {
          *
          *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
          *     quem consulta uma janela que cruza o presente.
+         *
+         *     Qualquer outro valor devolve **400 `PARAMETRO_INVALIDO`** — antes um `DSC` por engano
+         *     virava `asc` em silêncio e a lista saía na ordem oposta à pretendida, sem sinal.
          */
         Ordem: "asc" | "desc";
     };
@@ -1859,6 +1868,9 @@ export interface operations {
                  *
                  *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
                  *     quem consulta uma janela que cruza o presente.
+                 *
+                 *     Qualquer outro valor devolve **400 `PARAMETRO_INVALIDO`** — antes um `DSC` por engano
+                 *     virava `asc` em silêncio e a lista saía na ordem oposta à pretendida, sem sinal.
                  */
                 ordem?: components["parameters"]["Ordem"];
             };
@@ -2457,6 +2469,9 @@ export interface operations {
                  *
                  *     Explícito de propósito: inverter sozinho quando o período é passado surpreenderia
                  *     quem consulta uma janela que cruza o presente.
+                 *
+                 *     Qualquer outro valor devolve **400 `PARAMETRO_INVALIDO`** — antes um `DSC` por engano
+                 *     virava `asc` em silêncio e a lista saía na ordem oposta à pretendida, sem sinal.
                  */
                 ordem?: components["parameters"]["Ordem"];
             };

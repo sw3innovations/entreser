@@ -67,6 +67,13 @@ export function MinhasSessoesView() {
               // No histórico, a mais recente primeiro: é a que ela lembra e provavelmente
               // procura. Nas próximas, a mais perto de acontecer.
               ordem: anteriores ? 'desc' : 'asc',
+              // Em tudo MENOS "Próximas". A regra é essa, e não "só no histórico": uma
+              // sessão que ela largou não é próxima sessão dela, mas continua sendo parte do
+              // que ela viveu — e some por completo se só "Anteriores" a mostrar, já que um
+              // grupo abandonado que ainda não aconteceu não está nem no passado nem à
+              // frente. O card marca esses com "Você saiu"; sem o marcador (`jaInscrita`,
+              // que chegou agora) isto seria enganoso, e por isso só foi ligado nesta rodada.
+              ...(filtro.periodo === 'proximas' ? {} : { incluirSaidas: true }),
               page,
               size: 20,
             },
@@ -173,6 +180,15 @@ export function MinhasSessoesView() {
                     {s.linkMeetStatus === 'Falhou' && (
                       <span className="rounded-pill bg-red-alert/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-red-alert">
                         Sala com problema
+                      </span>
+                    )}
+                    {/* `jaInscrita === false` só acontece com `incluirSaidas=true` (histórico):
+                        é um grupo que ela largou. O `status` continua sendo o da SESSÃO — ela
+                        segue de pé para as outras —, então sem este selo o card diria
+                        "Agendada" e pareceria que ela participou. */}
+                    {s.jaInscrita === false && (
+                      <span className="rounded-pill bg-plum/8 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-plum/55">
+                        Você saiu
                       </span>
                     )}
                   </div>
