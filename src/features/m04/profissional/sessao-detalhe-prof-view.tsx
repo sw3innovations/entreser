@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BackButton, ESButton, PageHeader, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
@@ -49,7 +50,7 @@ export function SessaoDetalheProfView({ sessaoId }: { sessaoId: string }) {
 
   // Quem diz se o tipo é de grupo é o catálogo (`categoria`) — não um palpite sobre
   // `vagas`, que numa sessão individual pode vir 0 com `tituloGrupo` preenchido.
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const tipoInfo = dados ? catalogo?.tipos.find((t) => t.codigo === dados.tipo) : undefined
   const ehGrupo = tipoInfo?.categoria === 'Grupo'
   const ativos = (dados?.participantes ?? []).filter((p) => !p.saiuEm)

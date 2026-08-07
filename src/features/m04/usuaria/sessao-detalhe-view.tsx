@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui'
 import { useAuth } from '@/features/auth/context/auth-context'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
@@ -106,7 +107,7 @@ export function SessaoDetalheView({
     }
   }
   // Nome e categoria do tipo vêm do catálogo (nunca escritos na tela).
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const tipoInfo = dados ? catalogo?.tipos.find((t) => t.codigo === dados.tipo) : undefined
   const ehGrupo = tipoInfo?.categoria === 'Grupo'
   const saiuDoGrupo = !!dados && ehGrupo && jaSaiuDoGrupo(dados, user?.id)

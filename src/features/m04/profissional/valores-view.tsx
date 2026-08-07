@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ESButton, MoneyInput, PageHeader, formatCentavos, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
@@ -35,7 +36,7 @@ export function ValoresView() {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const { dados: catalogo, carregando: carregandoCatalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo, carregando: carregandoCatalogo } = useCatalogoTipos()
   const {
     dados: valores,
     carregando: carregandoValores,

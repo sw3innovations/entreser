@@ -15,6 +15,7 @@ import {
 } from '@/features/usuaria/ui'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { mensagemDe } from '@/features/m04/api/erros'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { blocoData, dataHoraPorExtenso, hora } from '@/features/m04/lib/datas'
@@ -23,7 +24,6 @@ import type { components } from '@/features/m04/api/schema'
 
 type TipoSessao = components['schemas']['TipoSessao']
 type ProfissionalDetalhe = components['schemas']['ProfissionalDetalhe']
-type TiposSessaoResponse = components['schemas']['TiposSessaoResponse']
 
 interface Props {
   tipo: TipoSessao
@@ -56,7 +56,7 @@ export function ConfirmarView({ tipo, profissionalId, inicio, fim }: Props) {
     () => m04.GET('/profissionais/{profissionalId}', { params: { path: { profissionalId } } }),
     [profissionalId],
   )
-  const { dados: catalogo } = useRecurso<TiposSessaoResponse>(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const tipoInfo = catalogo?.tipos.find((t) => t.codigo === tipo)
   const valor = profissional?.tiposOferecidos?.find((t) => t.tipoSessao === tipo)?.valor ?? null
 

@@ -6,6 +6,7 @@ import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon, CheckIcon, Credit
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { Estado } from '@/features/m04/ui/estado'
 import { iconeDoTipo } from '@/features/m04/lib/tipo-icone'
@@ -37,7 +38,7 @@ export function PerfilProfissionalView({ tipo, profissionalId }: { tipo: TipoSes
     () => m04.GET('/profissionais/{profissionalId}', { params: { path: { profissionalId } } }),
     [profissionalId],
   )
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const nomeDoTipo = (codigo: TipoSessao) => catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
   const valor = dados?.tiposOferecidos?.find((t) => t.tipoSessao === tipoSelecionado)?.valor ?? null

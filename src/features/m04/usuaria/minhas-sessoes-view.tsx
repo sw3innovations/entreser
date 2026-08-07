@@ -14,7 +14,7 @@ import {
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
-import { useRecurso } from '@/features/m04/api/use-recurso'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { useListaPaginada } from '@/features/m04/api/use-lista-paginada'
 import { Estado } from '@/features/m04/ui/estado'
 import { VerMais } from '@/features/m04/ui/ver-mais'
@@ -77,7 +77,7 @@ export function MinhasSessoesView() {
     )
 
   // Nome do tipo vem do catálogo (nunca escrito na tela).
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const nomeDoTipo = (s: SessaoResumo) => catalogo?.tipos.find((t) => t.codigo === s.tipo)?.nome ?? s.tipo
 
   const topBar = (

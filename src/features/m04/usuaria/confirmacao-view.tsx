@@ -12,6 +12,7 @@ import {
   CalendarIcon,
 } from '@/features/usuaria/ui'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { blocoData, diaPorExtenso, hora, reais } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
@@ -64,7 +65,7 @@ export function ConfirmacaoView({ sessaoId, ctx }: { sessaoId: string; ctx: Cont
     () => m04.GET('/sessoes/{sessaoId}', { params: { path: { sessaoId } } }),
     [sessaoId],
   )
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const tipoInfo = dados ? catalogo?.tipos.find((t) => t.codigo === dados.tipo) : undefined
   const nomeDaSessao = dados?.tituloGrupo?.trim() || tipoInfo?.nome
 

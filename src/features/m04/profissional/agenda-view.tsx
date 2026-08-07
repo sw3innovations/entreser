@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronRightIcon, Dialog, EmptyState, ESButton, PageHeader, SelectInput } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { useRecurso } from '@/features/m04/api/use-recurso'
 import { juntarSemRepetir } from '@/features/m04/api/use-lista-paginada'
 import { Estado } from '@/features/m04/ui/estado'
@@ -226,7 +227,7 @@ export function AgendaView() {
   })
 
   // Nome do tipo vem do catálogo — nada de rótulo escrito na tela.
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const nomeDoTipo = (codigo: SessaoResumo['tipo']) =>
     catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 

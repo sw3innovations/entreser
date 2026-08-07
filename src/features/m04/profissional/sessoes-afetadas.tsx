@@ -1,8 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { m04 } from '@/features/m04/api/client'
-import { useRecurso } from '@/features/m04/api/use-recurso'
+import { useCatalogoTipos } from '@/features/m04/api/use-catalogo'
 import { hora } from '@/features/m04/lib/datas'
 import type { components } from '@/features/m04/api/schema'
 
@@ -32,7 +31,7 @@ export function SessoesAfetadas({
   onFechar?: () => void
 }) {
   // Nome do tipo vem do catálogo — nunca escrito na tela.
-  const { dados: catalogo } = useRecurso(() => m04.GET('/tipos-sessao'), [])
+  const { catalogo } = useCatalogoTipos()
   const nomeDoTipo = (codigo: SessaoResumo['tipo']) =>
     catalogo?.tipos.find((t) => t.codigo === codigo)?.nome ?? codigo
 
