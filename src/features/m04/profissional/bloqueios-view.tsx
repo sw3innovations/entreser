@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { PageHeader, useToast } from '@/components/ui'
+import { ChevronLeftIcon, ChevronRightIcon, DateRangeInput, PageHeader, useToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { mensagemDe } from '@/features/m04/api/erros'
@@ -66,15 +66,22 @@ interface Celula {
   chave: string
 }
 
-/** As células de um mês (vazias no começo até cair no dia da semana certo). */
+/**
+ * As células de um mês (vazias no começo até cair no dia da semana certo). `mes` aceita
+ * qualquer inteiro (negativo ou ≥ 12) — a navegação por página soma `offsetMeses * 3` direto
+ * nele; normalizar aqui é o que faz "mês 13" virar fevereiro do ano seguinte em vez de
+ * `MESES[13]` (undefined).
+ */
 function montarMes(ano: number, mes: number): { nome: string; celulas: Celula[] } {
-  const ref = new Date(ano, mes, 1)
+  const anoReal = ano + Math.floor(mes / 12)
+  const mesReal = ((mes % 12) + 12) % 12
+  const ref = new Date(anoReal, mesReal, 1)
   const primeiro = ref.getDay()
-  const total = new Date(ano, mes + 1, 0).getDate()
+  const total = new Date(anoReal, mesReal + 1, 0).getDate()
   const celulas: Celula[] = []
   for (let i = 0; i < primeiro; i++) celulas.push({ dia: '', chave: '' })
-  for (let d = 1; d <= total; d++) celulas.push({ dia: String(d), chave: chaveDe(new Date(ano, mes, d)) })
-  return { nome: `${MESES[mes][0].toUpperCase()}${MESES[mes].slice(1)} de ${ano}`, celulas }
+  for (let d = 1; d <= total; d++) celulas.push({ dia: String(d), chave: chaveDe(new Date(anoReal, mesReal, d)) })
+  return { nome: `${MESES[mesReal][0].toUpperCase()}${MESES[mesReal].slice(1)} de ${anoReal}`, celulas }
 }
 
 /**
@@ -96,6 +103,8 @@ export function BloqueiosView() {
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [removendo, setRemovendo] = useState<string | null>(null)
   const [mostrarPassados, setMostrarPassados] = useState(false)
+  /** Página de 3 meses visível na grade: 0 = a que começa no mês corrente, 1 = a próxima… */
+  const [offsetMeses, setOffsetMeses] = useState(0)
 
   const { itens, total, carregando, carregandoMais, erro: erroCarga, temMais, carregarMais, recarregar } =
     useListaPaginada<Bloqueio>(
@@ -128,7 +137,9 @@ export function BloqueiosView() {
   }
 
   const hojeData = dataLocal(hoje)
-  const meses = [0, 1, 2].map((k) => montarMes(hojeData.getFullYear(), hojeData.getMonth() + k))
+  const meses = [0, 1, 2].map((k) =>
+    montarMes(hojeData.getFullYear(), hojeData.getMonth() + offsetMeses * 3 + k),
+  )
 
   const periodoInvalido = Boolean(inicio && fim && fim < inicio)
   const podeCriar = Boolean(inicio && fim) && !periodoInvalido
@@ -281,6 +292,38 @@ export function BloqueiosView() {
                   já bloqueado
                 </span>
               </div>
+
+              {/* Navegação por página de 3 meses. Sem "Anterior" antes do mês corrente —
+                  diferente da agenda, aqui olhar pra trás não tem função, já que não dá pra
+                  bloquear uma data que já passou. */}
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setOffsetMeses((o) => o - 1)}
+                  disabled={offsetMeses === 0}
+                  aria-label="Meses anteriores"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-plum/60 transition-colors hover:bg-plum/5 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <ChevronLeftIcon size={18} />
+                </button>
+                {offsetMeses !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOffsetMeses(0)}
+                    className="rounded-pill border border-mauve/25 px-3 py-1 text-[12px] font-semibold text-mauve transition-colors hover:border-mauve/45"
+                  >
+                    Hoje
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOffsetMeses((o) => o + 1)}
+                  aria-label="Próximos meses"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-plum/60 transition-colors hover:bg-plum/5"
+                >
+                  <ChevronRightIcon size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-x-[26px] gap-y-6 px-[26px] pb-[22px] [grid-template-columns:repeat(auto-fit,minmax(206px,1fr))]">
@@ -343,32 +386,25 @@ export function BloqueiosView() {
                   {dica}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <input
-                  type="date"
-                  value={inicio}
-                  min={hoje}
-                  onChange={(e) => {
-                    setInicio(e.target.value)
+              <div className="shrink-0">
+                {/* Sem `errorMessage` aqui: o destaque de período inválido já está na
+                    dica logo acima (`periodoInvalido`), e o campo só pinta a borda de
+                    erro quando tem uma mensagem para mostrar junto — duplicar o aviso
+                    sem texto criaria uma borda vermelha "muda". */}
+                <DateRangeInput
+                  className="w-[300px]"
+                  valueStart={inicio}
+                  valueEnd={fim}
+                  minStart={hoje}
+                  minEnd={inicio || hoje}
+                  onChangeStart={(v) => {
+                    setInicio(v)
                     setAfetadas(null)
                   }}
-                  className="w-[148px] rounded-[13px] border border-plum/14 bg-white px-3 py-2.5 text-sm font-medium text-plum outline-none transition-colors focus:border-mauve"
-                />
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(45,24,64,0.35)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-                <input
-                  type="date"
-                  value={fim}
-                  min={inicio || hoje}
-                  onChange={(e) => {
-                    setFim(e.target.value)
+                  onChangeEnd={(v) => {
+                    setFim(v)
                     setAfetadas(null)
                   }}
-                  className={cn(
-                    'w-[148px] rounded-[13px] border bg-white px-3 py-2.5 text-sm font-medium text-plum outline-none transition-colors focus:border-mauve',
-                    periodoInvalido ? 'border-red-alert/50' : 'border-plum/14',
-                  )}
                 />
               </div>
               {(inicio || fim) && (
