@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { EmptyState, ESButton, PageHeader } from '@/components/ui'
+import { EmptyState, ESButton, PageHeader, SelectInput } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -18,8 +18,6 @@ import {
   inicioDaSemanaISO,
   inicioDoDiaUTC,
   fimDoDiaUTC,
-  inicioDoMesUTC,
-  fimDoMesUTC,
   reais,
   HORIZONTE_AGENDAMENTO_DIAS,
   HORIZONTE_AGENDAMENTO_SEMANAS,
@@ -174,7 +172,9 @@ export function AgendaView() {
   const [filtroTipo, setFiltroTipo] = useState<SessaoResumo['tipo'] | 'todos'>('todos')
   const [pagina, setPagina] = useState(0)
   const [acumulado, setAcumulado] = useState<SessaoResumo[]>([])
-  const [variante, setVariante] = useState<'dia' | 'semana'>('dia')
+  // "Semana" é o padrão: a agenda é lida como planejamento ("como está a minha semana?"),
+  // e não como fila do dia. "Por dia" continua a um clique, para quem quer o recorte estreito.
+  const [variante, setVariante] = useState<'dia' | 'semana'>('semana')
   /** Semana visível na visão "Semana": 0 = a corrente, -1 = anterior, 1 = seguinte. */
   const [semanaOffset, setSemanaOffset] = useState(0)
   const [diaSel, setDiaSel] = useState(() => {
@@ -218,81 +218,23 @@ export function AgendaView() {
   const temMais = dados ? pagina + 1 < dados.totalPages : false
 
   /**
-   * Pendências (aguardando registro / sala falhou) — buscadas num período PRÓPRIO, que
-   * sempre inclui o passado, e nunca no período que a profissional escolheu na lista.
+   * As cinco contagens do topo, num fetch só — os recortes de tempo de cada uma são do
+   * servidor (ver `ResumoAgenda` no contrato), e nenhuma depende do período escolhido na
+   * lista nem da paginação.
    *
-   * Sem isso elas somem no default: "aguardando registro" é sessão que já passou, então
-   * com o período em "Próximas" o envelope devolveria sempre 0 e o painel diria que não há
-   * pendência — justamente o alerta que ele existe para dar.
+   * Isto era **quatro** requisições: três `size=1` disparadas só para ler um total do
+   * envelope, e uma `size=100` que baixava o mês inteiro para somar a receita no cliente —
+   * a única parte da tela que supunha um volume máximo de sessões.
+   *
+   * As pendências continuam corretas no default justamente por virem daqui: "aguardando
+   * registro" é sessão que já passou, e se elas saíssem do fetch da lista, o período
+   * "Próximas" devolveria sempre 0 — o painel diria que não há pendência exatamente
+   * quando ela existe.
    */
-  const { dados: pendencias } = useRecurso(
-    () =>
-      m04.GET('/profissional/agenda', {
-        params: {
-          query: {
-            de: `${emDiasISO(-DIAS_PASSADO)}T00:00:00Z`,
-            ate: `${emDiasISO(HORIZONTE_AGENDAMENTO_DIAS)}T23:59:59Z`,
-            page: 0,
-            size: 1,
-          },
-        },
-      }),
-    [],
-  )
-  const totalPendenteRegistro = pendencias?.totalPendenteRegistro ?? 0
-  const totalLinkMeetFalhou = pendencias?.totalLinkMeetFalhou ?? 0
-
-  // ── Métricas do topo — 3 chamadas leves extras (só contagem/soma), independentes do
-  // fetch principal e da paginação, para não mentir sobre um período que a página 0 não
-  // cobre inteiro.
-  //
-  // O filtro de status aqui NÃO é detalhe: o card diz "sessões marcadas", e sem ele a
-  // contagem incluía canceladas e não-compareceu. Numa agenda com histórico de cancelamento
-  // isso inflava muito (medido: 16 "marcadas" para 4 sessões realmente de pé).
-  const { dados: metricaSemana } = useRecurso(
-    () =>
-      m04.GET('/profissional/agenda', {
-        params: {
-          query: {
-            de: `${hojeISO()}T00:00:00Z`,
-            ate: `${emDiasISO(7)}T23:59:59Z`,
-            status: ['Agendada', 'Confirmada'],
-            page: 0,
-            size: 1,
-          },
-        },
-      }),
-    [],
-  )
-  // Conta TODAS as canceladas do período, sem distinguir quem cancelou: `canceladaPor` não
-  // existe no `SessaoResumo` da listagem nem como filtro de query (só na `Sessao` completa).
-  // Por isso o rótulo fala em "canceladas", e não "canceladas pelas usuárias" — dizer o
-  // segundo seria atribuir à usuária cancelamentos que a própria profissional fez.
-  const { dados: metricaCanceladas } = useRecurso(
-    () =>
-      m04.GET('/profissional/agenda', {
-        params: {
-          query: {
-            de: `${emDiasISO(-14)}T00:00:00Z`,
-            ate: `${hojeISO()}T23:59:59Z`,
-            status: ['Cancelada'],
-            page: 0,
-            size: 1,
-          },
-        },
-      }),
-    [],
-  )
-  // Uma página de até 100 sessões para o mês inteiro — soma no cliente porque o backend não
-  // tem endpoint de agregado de receita. 100 é uma folga generosa sobre o volume real de uma
-  // profissional num mês; documentado aqui em vez de truncar em silêncio se um dia isso mudar.
-  const { dados: metricaMes } = useRecurso(
-    () => m04.GET('/profissional/agenda', { params: { query: { de: inicioDoMesUTC(), ate: fimDoMesUTC(), page: 0, size: 100 } } }),
-    [],
-  )
-  const previstoNoMes = (metricaMes?.content ?? [])
-    .filter((s) => s.status === 'Agendada' || s.status === 'Confirmada' || s.status === 'Realizada')
-    .reduce((soma, s) => soma + (s.valorPraticado ?? 0), 0)
+  const { dados: resumo } = useRecurso(() => m04.GET('/profissional/agenda/resumo', {}), [])
+  const totalPendenteRegistro = resumo?.pendenteRegistro ?? 0
+  const totalLinkMeetFalhou = resumo?.linkMeetFalhou ?? 0
+  const previstoNoMes = resumo?.receitaPrevistaMes ?? 0
 
   // ── Semana — um fetch cobre a semana VISÍVEL inteira (a corrente ou outra, conforme o
   // `semanaOffset`); alimenta a visão "Semana" e o card "Ritmo da semana", que andam juntos.
@@ -486,16 +428,20 @@ export function AgendaView() {
 
       {/* Métricas */}
       <div className="mb-6 grid grid-cols-1 gap-px overflow-hidden rounded-[22px] border border-white/60 bg-plum/7 shadow-[0_4px_24px_rgba(45,24,64,0.05)] sm:grid-cols-2 lg:grid-cols-4">
-        <Metrica rotulo="Próximos 7 dias" valor={String(metricaSemana?.totalElements ?? '—')} nota="sessões marcadas" />
+        <Metrica rotulo="Próximos 7 dias" valor={String(resumo?.proximos7Dias ?? '—')} nota="sessões marcadas" />
         <Metrica
           rotulo="Aguardando registro"
-          valor={pendencias ? String(totalPendenteRegistro) : '—'}
+          valor={resumo ? String(totalPendenteRegistro) : '—'}
           nota="já aconteceram"
           cor="text-mauve"
         />
+        {/* "canceladas", não "canceladas pelas usuárias": o `/resumo` devolve o total do
+            período sem separar quem cancelou. O `canceladaPor` do `SessaoResumo` permite a
+            distinção item a item, mas só sobre a página carregada — e voltar a baixar o
+            período inteiro para refinar um rótulo desfaria o ganho deste endpoint. */}
         <Metrica
           rotulo="Últimos 14 dias"
-          valor={String(metricaCanceladas?.totalElements ?? '—')}
+          valor={String(resumo?.canceladas14Dias ?? '—')}
           nota="canceladas"
         />
         <Metrica rotulo="Previsto no mês" valor={reais(previstoNoMes) ?? 'R$ 0,00'} nota="sessões agendadas e realizadas" />
@@ -575,18 +521,15 @@ export function AgendaView() {
                       Limpar filtros
                     </button>
                   )}
-                  <select
-                    value={filtroTipo}
-                    onChange={(e) => trocarTipo(e.target.value as SessaoResumo['tipo'] | 'todos')}
-                    className="rounded-pill border border-plum/12 bg-white px-4 py-2 text-[13px] font-medium text-plum/70 transition-colors hover:border-plum/25 focus:outline-none focus:ring-1 focus:ring-mauve/40"
-                  >
-                    <option value="todos">Todos os tipos</option>
-                    {catalogo?.tipos.map((t) => (
-                      <option key={t.codigo} value={t.codigo}>
-                        {t.nome}
-                      </option>
-                    ))}
-                  </select>
+                  <SelectInput
+                    className="w-48"
+                    selectedKey={filtroTipo}
+                    onChange={(key) => trocarTipo(key as SessaoResumo['tipo'] | 'todos')}
+                    options={[
+                      { key: 'todos', label: 'Todos os tipos' },
+                      ...(catalogo?.tipos.map((t) => ({ key: t.codigo, label: t.nome })) ?? []),
+                    ]}
+                  />
                 </div>
               </div>
 
