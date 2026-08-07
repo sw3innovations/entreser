@@ -6,7 +6,7 @@ import { ESAvatar, ESProgressBar, ESSkeleton, ConteudosIcon, TrilhasIcon, Agenda
 import { useAuth } from '@/features/auth/context/auth-context'
 import { useProximaSessao } from '@/features/m04/usuaria/use-proxima-sessao'
 import { blocoData, diaPorExtenso, diasAte, hora, quandoAcontece } from '@/features/m04/lib/datas'
-import { PlumHero, GlassCard, ContentCard, ChevronRightIcon, CalendarPlusIcon } from '../ui'
+import { PlumHero, GlassCard, ContentCard, ChevronRightIcon, CalendarPlusIcon, NotificacoesMenu } from '../ui'
 import { useMinhaFase } from '../fase/use-minha-fase'
 import { useFeed } from '../feed/use-feed'
 import { useTrilhas } from '../trilhas/use-trilhas'
@@ -64,6 +64,13 @@ export function HomeView() {
               <h1 className="truncate font-display text-2xl font-light text-cream lg:text-3xl">
                 Olá{primeiro ? `, ${primeiro}` : ''}!
               </h1>
+            </div>
+            {/* O sino do header é `hidden lg:block` — no mobile não existe barra superior
+                nenhuma, então ali a notificação não tinha onde aparecer. A home é onde ela
+                entra, e o hero é o único lugar fixo no topo. `lg:hidden` para não duplicar
+                o sino do header no desktop. */}
+            <div className="lg:hidden">
+              <NotificacoesMenu tom="escuro" />
             </div>
           </div>
           {/* Uma linha de contexto dá função ao hero, que antes era só saudação num

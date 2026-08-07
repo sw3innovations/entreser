@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { EmptyState, ESButton, PageHeader, SelectInput } from '@/components/ui'
+import { ChevronRightIcon, Dialog, EmptyState, ESButton, PageHeader, SelectInput } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { m04 } from '@/features/m04/api/client'
 import { useRecurso } from '@/features/m04/api/use-recurso'
@@ -31,7 +31,7 @@ type StatusSessao = components['schemas']['StatusSessao']
 const CARD = 'rounded-card border border-plum/5 bg-white p-[26px] shadow-[0_10px_30px_rgba(45,24,64,0.06)]'
 
 /** Filtro de pendência — sempre resolvido NO SERVIDOR (D15). */
-type Pendencia = 'todas' | 'registro' | 'sala'
+type Pendencia = 'todas' | 'registro' | 'sala' | 'canceladas'
 
 /**
  * Filtro de status — seleção única de "chip", igual ao padrão já usado em
@@ -150,6 +150,42 @@ function rotuloDaSemana(dias: string[]): string {
 const ALTURA_LINHA = 56
 
 /**
+ * Legenda do grupo de canceladas do diálogo. O agrupamento é por SOBREPOSIÇÃO, não por
+ * horário igual — 14:00, 14:10 e 15:00 podem cair no mesmo bloco. Dizer "todas às 14:00"
+ * nesse caso seria falso, então a faixa só vira um horário único quando de fato é um.
+ */
+function descricaoDoGrupo(sessoes: SessaoResumo[]): string {
+  const dia = diaPorExtenso(sessoes[0].dataHora)
+  const horarios = sessoes.map((s) => hora(s.dataHora))
+  const distintos = [...new Set(horarios)]
+  if (distintos.length === 1) return `Todas às ${distintos[0]} de ${dia}.`
+  return `Entre ${distintos[0]} e ${distintos[distintos.length - 1]} de ${dia}.`
+}
+
+/**
+ * Agrupa blocos que se tocam verticalmente — cada grupo é um conjunto que precisa dividir
+ * espaço entre si, e grupos diferentes não se enxergam. Usado duas vezes na grade do dia:
+ * para colapsar canceladas repetidas e para distribuir o resto em colunas.
+ */
+function agruparPorSobreposicao<T extends { top: number; altura: number }>(blocos: T[]): T[][] {
+  const grupos: T[][] = []
+  let atual: T[] = []
+  let fimDoGrupo = -Infinity
+
+  for (const b of [...blocos].sort((a, z) => a.top - z.top)) {
+    if (atual.length > 0 && b.top >= fimDoGrupo) {
+      grupos.push(atual)
+      atual = []
+      fimDoGrupo = -Infinity
+    }
+    atual.push(b)
+    fimDoGrupo = Math.max(fimDoGrupo, b.top + b.altura)
+  }
+  if (atual.length > 0) grupos.push(atual)
+  return grupos
+}
+
+/**
  * P1 · Minha agenda — o hub do painel. A lista abre em "Próximas": o passado continua
  * alcançável pelo filtro de período, mas não ocupa mais as primeiras páginas.
  *
@@ -164,6 +200,14 @@ const ALTURA_LINHA = 56
  */
 export function AgendaView() {
   const [pendencia, setPendencia] = useState<Pendencia>('todas')
+  /** Canceladas de um mesmo horário, abertas em diálogo a partir do cartão agregado. */
+  const [canceladasAbertas, setCanceladasAbertas] = useState<SessaoResumo[] | null>(null)
+  /**
+   * Esconde as canceladas da grade da semana. A visão "Por dia" já tem filtro de status; a
+   * grade não tinha nenhum, e numa agenda com muito cancelamento elas dominam o dia mesmo
+   * colapsadas. Começa desligado: esconder por padrão apagaria histórico sem avisar.
+   */
+  const [ocultarCanceladas, setOcultarCanceladas] = useState(false)
   const [periodo, setPeriodo] = useState<ChavePeriodo>('proximas')
   const [filtroStatus, setFiltroStatus] = useState(FILTROS_STATUS[0])
   const [filtroTipo, setFiltroTipo] = useState<SessaoResumo['tipo'] | 'todos'>('todos')
@@ -200,6 +244,9 @@ export function AgendaView() {
             ...(pendencia === 'registro' ? { pendenteRegistro: true } : {}),
             ...(pendencia === 'sala' ? { linkMeetStatus: ['Falhou' as const] } : {}),
             ...(filtroStatus.status ? { status: filtroStatus.status } : {}),
+            // Depois do `filtroStatus` de propósito: ao entrar pelo card de canceladas, é
+            // este recorte que vale, mesmo que a pílula de status diga outra coisa.
+            ...(pendencia === 'canceladas' ? { status: ['Cancelada' as const] } : {}),
             ...(filtroTipo !== 'todos' ? { tipo: [filtroTipo] } : {}),
           },
         },
@@ -231,6 +278,35 @@ export function AgendaView() {
    * quando ela existe.
    */
   const { dados: resumo } = useRecurso(() => m04.GET('/profissional/agenda/resumo', {}), [])
+
+  /**
+   * Sessões canceladas que AINDA ESTÃO NO FUTURO — combinados desfeitos, buracos que
+   * abriram na agenda. É o recorte que faz o cancelamento virar notícia em vez de estado:
+   * era para acontecer, não vai mais, e ainda dá tempo de fazer algo. Sai sozinho da conta
+   * quando a data passa.
+   *
+   * Não dá para pedir "só as que a usuária cancelou" (não há filtro por `canceladaPor` na
+   * listagem — ver TASKS_BACKEND_M04_R2.md §1.3), então o rótulo fala de horários livres,
+   * que é verdade independente de quem cancelou. Quem cancelou aparece em cada cartão.
+   *
+   * `size=1`: só o `totalElements` do envelope interessa aqui.
+   */
+  const { dados: canceladasFuturas } = useRecurso(
+    () =>
+      m04.GET('/profissional/agenda', {
+        params: {
+          query: {
+            de: `${hojeISO()}T00:00:00Z`,
+            ate: `${emDiasISO(HORIZONTE_AGENDAMENTO_DIAS)}T23:59:59Z`,
+            status: ['Cancelada'],
+            page: 0,
+            size: 1,
+          },
+        },
+      }),
+    [],
+  )
+  const totalCanceladasFuturas = canceladasFuturas?.totalElements ?? 0
   const totalPendenteRegistro = resumo?.pendenteRegistro ?? 0
   const totalLinkMeetFalhou = resumo?.linkMeetFalhou ?? 0
   const previstoNoMes = resumo?.receitaPrevistaMes ?? 0
@@ -303,16 +379,68 @@ export function AgendaView() {
   const horaMax = horasDaSemana.length ? Math.min(23, Math.max(...horasDaSemana) + 2) : 20
   const linhasHora = Array.from({ length: horaMax - horaMin + 1 }, (_, i) => horaMin + i)
 
-  const sessoesDoDiaSel = semanaPorDia[diaSel] ?? []
-  const blocosDoDia = sessoesDoDiaSel.map((s) => {
-    const d = new Date(s.dataHora)
-    const fracao = d.getHours() - horaMin + d.getMinutes() / 60
-    return {
-      sessao: s,
-      top: Math.round(fracao * ALTURA_LINHA),
-      altura: Math.max(30, Math.round((s.duracaoMinutos / 60) * ALTURA_LINHA - 6)),
-    }
-  })
+  const sessoesDoDiaTodas = semanaPorDia[diaSel] ?? []
+  const canceladasNoDia = sessoesDoDiaTodas.filter((s) => s.status === 'Cancelada').length
+  const sessoesDoDiaSel = ocultarCanceladas
+    ? sessoesDoDiaTodas.filter((s) => s.status !== 'Cancelada')
+    : sessoesDoDiaTodas
+
+  /**
+   * Blocos da grade do dia, já resolvidos para NÃO se sobrepor.
+   *
+   * Duas coisas acontecem aqui, nesta ordem:
+   *
+   * 1. **Canceladas que disputam o mesmo espaço viram um bloco só** ("N canceladas"). Marcar
+   *    e desmarcar o mesmo horário é comum — um horário real da base tinha 5 canceladas mais
+   *    a sessão de verdade —, e cada tentativa virando uma coluna espremia justamente a única
+   *    que a profissional precisa ler. A informação não some: o cartão diz quantas foram, e a
+   *    lista "Por dia" continua mostrando uma a uma.
+   * 2. **O que sobra vira colunas lado a lado**, como num calendário de verdade. Antes todos
+   *    ocupavam a largura inteira, então 16:00 e 16:30 se empilhavam e o de baixo cobria o
+   *    de cima.
+   *
+   * A disputa é medida pela extensão VISUAL (topo → topo+altura), não pelo horário: a altura
+   * mínima de 30px faz duas sessões próximas ocuparem o mesmo pixel mesmo quando os horários
+   * não chegam a se cruzar, e comparar `dataHora` deixaria esses casos de fora.
+   */
+  const blocosDoDia = (() => {
+    const bruto = sessoesDoDiaSel.map((s) => {
+      const d = new Date(s.dataHora)
+      const fracao = d.getHours() - horaMin + d.getMinutes() / 60
+      return {
+        sessao: s,
+        top: Math.round(fracao * ALTURA_LINHA),
+        altura: Math.max(30, Math.round((s.duracaoMinutos / 60) * ALTURA_LINHA - 6)),
+        // Quem o cartão representa: uma sessão no caso normal, o grupo inteiro quando
+        // colapsado — é o que o diálogo abre para nenhuma delas ficar inalcançável.
+        sessoes: [s],
+      }
+    })
+
+    const canceladas = bruto.filter((b) => b.sessao.status === 'Cancelada')
+    const demais = bruto.filter((b) => b.sessao.status !== 'Cancelada')
+    const colapsadas = agruparPorSobreposicao(canceladas).map((g) =>
+      g.length === 1
+        ? g[0]
+        : { ...g[0], altura: Math.max(...g.map((x) => x.altura)), sessoes: g.map((x) => x.sessao) },
+    )
+
+    // First-fit: cada bloco entra na primeira coluna já livre naquela altura; se não houver,
+    // abre uma nova. `colunas` é o total do grupo, para o JSX saber em quantas partes dividir.
+    return agruparPorSobreposicao([...demais, ...colapsadas]).flatMap((grupo) => {
+      const fimPorColuna: number[] = []
+      const comColuna = grupo.map((b) => {
+        let coluna = fimPorColuna.findIndex((fim) => fim <= b.top)
+        if (coluna === -1) {
+          coluna = fimPorColuna.length
+          fimPorColuna.push(0)
+        }
+        fimPorColuna[coluna] = b.top + b.altura
+        return { ...b, coluna }
+      })
+      return comColuna.map((b) => ({ ...b, colunas: fimPorColuna.length }))
+    })
+  })()
 
   /**
    * Navega entre semanas. O dia selecionado acompanha: ao sair da semana corrente ele vai
@@ -340,10 +468,17 @@ export function AgendaView() {
 
   const trocarFiltro = (p: Pendencia) => {
     setPendencia(p)
+    // Os cards de pendência filtram a LISTA, que só existe em "Por dia" — na grade da semana
+    // o clique aplicava um filtro invisível e parecia não fazer nada. Ficou evidente quando
+    // "Semana" virou a visão padrão; antes o caso quase não acontecia.
+    if (p !== 'todas' && variante === 'semana') trocarVariante('dia')
     // "Aguardando registro" é, por definição, sessão que JÁ passou. Com o período em
     // "Próximas" o filtro devolveria zero e a pendência pareceria resolvida — então
     // clicar nela abre o período que a contém.
     if (p === 'registro' && periodo === 'proximas') setPeriodo('todas')
+    // O oposto para as canceladas à frente: elas só existem no futuro, e num período de
+    // passado o filtro viria vazio.
+    if (p === 'canceladas' && periodo === 'anteriores') setPeriodo('proximas')
     setPagina(0)
     setAcumulado([])
   }
@@ -450,7 +585,7 @@ export function AgendaView() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_316px]">
         <div className="min-w-0">
           {/* Pendências */}
-          {(totalPendenteRegistro > 0 || totalLinkMeetFalhou > 0) && (
+          {(totalPendenteRegistro > 0 || totalLinkMeetFalhou > 0 || totalCanceladasFuturas > 0) && (
             <div className="mb-5 grid gap-3 sm:grid-cols-2">
               {totalPendenteRegistro > 0 && (
                 <Pendente
@@ -468,6 +603,17 @@ export function AgendaView() {
                   titulo={`${totalLinkMeetFalhou} ${totalLinkMeetFalhou === 1 ? 'sala precisa' : 'salas precisam'} de link manual`}
                   descricao="Não conseguimos criar a sala automaticamente."
                   onClick={() => trocarFiltro(pendencia === 'sala' ? 'todas' : 'sala')}
+                />
+              )}
+              {/* O cancelamento chega por e-mail, mas dentro do app era só um status que
+                  sumia da lista — dava para não ver. Aqui ele aparece onde ela já olha. */}
+              {totalCanceladasFuturas > 0 && (
+                <Pendente
+                  tom="mauve"
+                  ativo={pendencia === 'canceladas'}
+                  titulo={`${totalCanceladasFuturas} ${totalCanceladasFuturas === 1 ? 'sessão cancelada' : 'sessões canceladas'} à frente`}
+                  descricao="Horários que voltaram a ficar livres na sua agenda."
+                  onClick={() => trocarFiltro(pendencia === 'canceladas' ? 'todas' : 'canceladas')}
                 />
               )}
             </div>
@@ -561,11 +707,20 @@ export function AgendaView() {
               aoRepetir={recarregar}
               aoVazio={
                 <EmptyState
-                  title={pendencia === 'todas' ? 'Nenhuma sessão no período' : 'Nada pendente por aqui'}
+                  title={
+                    pendencia === 'todas'
+                      ? 'Nenhuma sessão no período'
+                      : pendencia === 'canceladas'
+                        // Cancelamento não é pendência: não há nada a "ficar em dia" com ele.
+                        ? 'Nada foi desmarcado'
+                        : 'Nada pendente por aqui'
+                  }
                   description={
                     pendencia === 'todas'
                       ? 'Quando alguém marcar com você, a sessão aparece aqui.'
-                      : 'Você está em dia com esta pendência.'
+                      : pendencia === 'canceladas'
+                        ? 'Nenhuma sessão cancelada neste período.'
+                        : 'Você está em dia com esta pendência.'
                   }
                   action={
                     pendencia === 'todas' ? (
@@ -717,18 +872,42 @@ export function AgendaView() {
               </div>
 
               <div className={CARD}>
-                <div className="mb-5 flex items-baseline gap-3">
+                <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
                   <h2 className="font-display text-xl leading-none text-plum">
                     {dataLocalDe(diasSemanaISO[diaSel]).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </h2>
                   <span className="text-xs text-plum/45">{sessoesDoDiaSel.length === 0 ? 'nada marcado' : `${sessoesDoDiaSel.length} ${sessoesDoDiaSel.length === 1 ? 'sessão' : 'sessões'}`}</span>
+                  {/* Só aparece quando há o que esconder — um botão que não muda nada é ruído.
+                      O rótulo diz o que vai acontecer, não o estado atual. */}
+                  {canceladasNoDia > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOcultarCanceladas((v) => !v)}
+                      className={cn(
+                        'ml-auto shrink-0 rounded-pill border px-3.5 py-1.5 text-[12.5px] font-semibold transition-es',
+                        ocultarCanceladas
+                          ? 'border-mauve bg-mauve-ghost text-mauve'
+                          : 'border-plum/14 bg-white text-plum/70 hover:border-plum/30 hover:text-plum',
+                      )}
+                    >
+                      {ocultarCanceladas
+                        ? `Mostrar ${canceladasNoDia} ${canceladasNoDia === 1 ? 'cancelada' : 'canceladas'}`
+                        : `Ocultar ${canceladasNoDia === 1 ? 'cancelada' : 'canceladas'}`}
+                    </button>
+                  )}
                 </div>
 
                 {sessoesDoDiaSel.length === 0 ? (
                   <div className="rounded-[18px] border border-dashed border-plum/14 p-11 text-center">
-                    <p className="font-display text-xl text-plum">Nenhuma sessão neste dia</p>
+                    <p className="font-display text-xl text-plum">
+                      {ocultarCanceladas && canceladasNoDia > 0 ? 'Só canceladas neste dia' : 'Nenhuma sessão neste dia'}
+                    </p>
                     <p className="mx-auto mt-2 max-w-[360px] text-[13.5px] leading-relaxed text-plum/55">
-                      Você não publicou horários para este dia da semana.
+                      {/* Sem esta distinção o filtro mentiria: o dia TEM sessões, elas é que
+                          estão escondidas, e "você não publicou horários" seria falso. */}
+                      {ocultarCanceladas && canceladasNoDia > 0
+                        ? `As ${canceladasNoDia} sessões deste dia foram canceladas e estão ocultas.`
+                        : 'Você não publicou horários para este dia da semana.'}
                     </p>
                   </div>
                 ) : (
@@ -739,25 +918,55 @@ export function AgendaView() {
                         <span className="h-px flex-1 bg-plum/[0.06]" />
                       </div>
                     ))}
-                    {blocosDoDia.map(({ sessao, top, altura }) => (
-                      <Link
-                        key={sessao.id}
-                        href={`/admin/agenda/${sessao.id}`}
-                        className="absolute left-[62px] right-0 flex items-center gap-3.5 rounded-2xl px-4 transition-es hover:translate-x-0.5"
-                        style={{
-                          top,
-                          height: altura,
-                          background: sessao.status === 'Cancelada' ? 'var(--color-plum-soft)' : sessao.status === 'NaoCompareceu' ? '#FBEEF0' : sessao.status === 'Realizada' ? 'var(--color-success-light)' : 'var(--color-mauve-ghost)',
-                          borderLeft: `3px solid ${DOT_TOM[sessao.status]}`,
-                        }}
-                      >
-                        <span className="font-display text-[16px] leading-none text-plum">{hora(sessao.dataHora)}</span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-plum">{tituloDaSessao(sessao, nomeDoTipo)}</span>
-                        <span className={cn('shrink-0 rounded-pill px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider', STATUS_TOM[sessao.status])}>
-                          {STATUS_LABEL[sessao.status]}
-                        </span>
-                      </Link>
-                    ))}
+                    {blocosDoDia.map(({ sessao, top, altura, coluna, colunas, sessoes }) => {
+                      const agregado = sessoes.length > 1
+                      // A faixa útil começa depois da régua de horas (62px). Dividi-la em
+                      // `colunas` partes é o que impede o empilhamento; com uma coluna só, o
+                      // resultado é idêntico ao layout de largura cheia de antes.
+                      const estilo = {
+                        top,
+                        height: altura,
+                        left: `calc(62px + ${coluna} * (100% - 62px) / ${colunas})`,
+                        width: `calc((100% - 62px) / ${colunas} - 6px)`,
+                        background: sessao.status === 'Cancelada' ? 'var(--color-plum-soft)' : sessao.status === 'NaoCompareceu' ? '#FBEEF0' : sessao.status === 'Realizada' ? 'var(--color-success-light)' : 'var(--color-mauve-ghost)',
+                        borderLeft: `3px solid ${DOT_TOM[sessao.status]}`,
+                      }
+                      const classe = 'absolute flex items-center gap-3.5 overflow-hidden rounded-2xl px-4 text-left transition-es hover:translate-x-0.5'
+                      const conteudo = (
+                        <>
+                          <span className="shrink-0 font-display text-[16px] leading-none text-plum">{hora(sessao.dataHora)}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-plum">
+                            {agregado ? `${sessoes.length} canceladas` : tituloDaSessao(sessao, nomeDoTipo)}
+                          </span>
+                          {/* O selo é a primeira coisa a sair quando a coluna aperta: o horário
+                              e o nome identificam a sessão, e a cor do cartão já dá o status. */}
+                          {colunas === 1 && !agregado && (
+                            <span className={cn('shrink-0 rounded-pill px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider', STATUS_TOM[sessao.status])}>
+                              {STATUS_LABEL[sessao.status]}
+                            </span>
+                          )}
+                        </>
+                      )
+
+                      // Cartão agregado abre a lista: linkar direto levaria a UMA das canceladas
+                      // sem dizer qual, e deixaria as outras sem nenhum caminho até elas.
+                      return agregado ? (
+                        <button
+                          key={sessao.id}
+                          type="button"
+                          onClick={() => setCanceladasAbertas(sessoes)}
+                          title={`Ver as ${sessoes.length} sessões canceladas deste horário`}
+                          className={classe}
+                          style={estilo}
+                        >
+                          {conteudo}
+                        </button>
+                      ) : (
+                        <Link key={sessao.id} href={`/admin/agenda/${sessao.id}`} className={classe} style={estilo}>
+                          {conteudo}
+                        </Link>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -833,6 +1042,36 @@ export function AgendaView() {
           </div>
         </aside>
       </div>
+
+      {/* As canceladas que o cartão agregado representa. Sem isto, colapsar as escondia:
+          na grade elas viram um número, e este é o caminho de volta até cada uma. */}
+      <Dialog
+        isOpen={canceladasAbertas !== null}
+        onClose={() => setCanceladasAbertas(null)}
+        title={canceladasAbertas ? `${canceladasAbertas.length} sessões canceladas` : ''}
+        description={canceladasAbertas ? descricaoDoGrupo(canceladasAbertas) : undefined}
+        width={460}
+      >
+        {/* Teto de altura porque o grupo não tem tamanho fixo: um horário da base já juntou
+            5 canceladas, e nada impede que sejam 15. Sem isto o painel cresceria para fora
+            da tela — o `overflow-hidden` do Dialog cortaria as últimas sem aviso. */}
+        <div className="flex max-h-[46vh] flex-col gap-1.5 overflow-y-auto">
+          {(canceladasAbertas ?? []).map((s) => (
+            <Link
+              key={s.id}
+              href={`/admin/agenda/${s.id}`}
+              onClick={() => setCanceladasAbertas(null)}
+              className="flex items-center gap-3 rounded-input border border-plum/8 bg-white px-3.5 py-3 transition-es hover:border-mauve/40 hover:bg-cream"
+            >
+              <span className="font-display text-[15px] leading-none text-plum">{hora(s.dataHora)}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-plum">{tituloDaSessao(s, nomeDoTipo)}</span>
+              <span className="shrink-0 text-plum/30">
+                <ChevronRightIcon size={16} />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Dialog>
     </div>
   )
 }

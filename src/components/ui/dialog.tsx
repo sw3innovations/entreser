@@ -79,7 +79,10 @@ export function Dialog({
             )}
           </div>
         )}
-        {children && <div className="px-6 pt-4">{children}</div>}
+        {/* Sem `footer`, o respiro de baixo tem de vir daqui: senão o conteúdo encosta na
+            borda do painel. Com rodapé, ele já traz o próprio `p-6` e repetir aqui dobraria
+            o espaço entre conteúdo e botões. */}
+        {children && <div className={cn('px-6 pt-4', footer ? undefined : 'pb-6')}>{children}</div>}
         {footer && <div className="mt-2 flex justify-end gap-2.5 p-6">{footer}</div>}
       </div>
     </div>,

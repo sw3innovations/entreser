@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ESAvatar, LockIcon, LogoutIcon, PanelLeftIcon } from '@/components/ui'
+import Link from 'next/link'
+import { ESAvatar, LockIcon, LogoutIcon, PanelLeftIcon, SinoIcon } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { useNovidades } from '@/features/m04/ui/use-novidades'
 import type { BackofficeProfile } from './backoffice-nav'
 
 interface BackofficeTopbarProps {
@@ -66,6 +68,10 @@ export function BackofficeTopbar({
         <PanelLeftIcon size={20} />
       </button>
 
+      <div className="ml-auto flex items-center gap-3">
+        {/* Só a profissional tem agenda — para o Admin Geral o sino não teria o que dizer. */}
+        {profile === 'prof' && <SinoNovidades />}
+
       <div className="relative" ref={menuRef}>
         <button
           type="button"
@@ -98,7 +104,97 @@ export function BackofficeTopbar({
           </div>
         )}
       </div>
+      </div>
     </header>
+  )
+}
+
+/**
+ * Sino do backoffice — espelha o da usuária (`usuaria-header.tsx`). O cancelamento chegava
+ * só por e-mail; dentro do app a sessão sumia da lista e ela podia não ver que abriu um
+ * buraco na agenda.
+ */
+function SinoNovidades() {
+  const [aberto, setAberto] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const { novidades, naoVistas, marcarComoVistas } = useNovidades('profissional')
+
+  useEffect(() => {
+    if (!aberto) return
+    const fora = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false)
+    }
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAberto(false)
+    }
+    document.addEventListener('pointerdown', fora)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('pointerdown', fora)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [aberto])
+
+  const alternar = () => {
+    if (!aberto) marcarComoVistas()
+    setAberto((v) => !v)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={alternar}
+        aria-haspopup="menu"
+        aria-expanded={aberto}
+        aria-label={naoVistas > 0 ? `Notificações (${naoVistas} não lidas)` : 'Notificações'}
+        className={cn(
+          'relative flex h-[38px] w-[38px] items-center justify-center rounded-[10px] text-plum/60 transition-colors hover:bg-plum/5',
+          aberto && 'bg-plum/5 text-plum',
+        )}
+      >
+        <SinoIcon size={20} />
+        {naoVistas > 0 && (
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-mauve ring-2 ring-white" />
+        )}
+      </button>
+
+      {aberto && (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+8px)] z-[31] w-[320px] overflow-hidden rounded-2xl border border-plum/6 bg-white shadow-modal"
+        >
+          <div className="border-b border-plum/8 px-4 py-3.5">
+            <p className="text-sm font-medium text-plum">Notificações</p>
+          </div>
+          {novidades.length === 0 ? (
+            <div className="px-6 py-10 text-center">
+              <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-mauve-ghost text-mauve">
+                <SinoIcon size={20} />
+              </span>
+              <p className="mt-3 text-sm font-medium text-plum">Você está em dia</p>
+              <p className="mt-1 text-xs leading-relaxed text-plum/45">
+                Cancelamentos e avisos aparecem aqui.
+              </p>
+            </div>
+          ) : (
+            <div className="max-h-[60vh] overflow-y-auto">
+              {novidades.map((n) => (
+                <Link
+                  key={n.id}
+                  href={n.href}
+                  onClick={() => setAberto(false)}
+                  className="flex flex-col gap-1 border-b border-plum/6 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-cream"
+                >
+                  <span className="text-[13.5px] font-medium text-plum">{n.titulo}</span>
+                  <span className="text-xs leading-relaxed text-plum/55">{n.descricao}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 

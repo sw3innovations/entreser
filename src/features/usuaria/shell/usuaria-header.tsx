@@ -6,7 +6,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ESAvatar, LogoutIcon, ChevronDownIcon, PerfilIcon } from '@/components/ui'
 import { useAuth } from '@/features/auth/context/auth-context'
-import { getActiveKey, BellIcon } from '../ui'
+
+import { getActiveKey, NotificacoesMenu } from '../ui'
 import { USUARIA_NAV } from './usuaria-nav'
 
 /**
@@ -61,7 +62,7 @@ export function UsuariaHeader() {
 
         {/* Notificações + conta (direita) */}
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          <NotificationsMenu />
+          <NotificacoesMenu />
           <AccountMenu nome={user?.nome} email={user?.email} onLogout={handleLogout} />
         </div>
       </div>
@@ -88,54 +89,6 @@ function useDismiss(open: boolean, ref: RefObject<HTMLElement | null>, onClose: 
   }, [open, ref, onClose])
 }
 
-/** Sino de notificações — botão circular com indicador de novidades, abrindo um
- *  painel. O feed de notificações não faz parte do M05, então o painel exibe um
- *  estado vazio acolhedor; o indicador segue o design pedido para o header. */
-function NotificationsMenu() {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useDismiss(open, ref, () => setOpen(false))
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="Notificações"
-        className={cn(
-          'relative flex h-10 w-10 items-center justify-center rounded-full border border-plum/12 text-plum/55 transition-es hover:border-plum/20 hover:bg-plum/5 hover:text-plum',
-          open && 'border-plum/20 bg-plum/5 text-plum',
-        )}
-      >
-        <BellIcon size={20} />
-        {/* Indicador de novidades */}
-        <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-mauve ring-2 ring-white" />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-plum/8 bg-white shadow-modal"
-        >
-          <div className="flex items-center justify-between border-b border-plum/8 px-4 py-3.5">
-            <p className="text-sm font-medium text-plum">Notificações</p>
-          </div>
-          <div className="px-6 py-10 text-center">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-mauve-ghost text-mauve">
-              <BellIcon size={20} />
-            </span>
-            <p className="mt-3 text-sm font-medium text-plum">Você está em dia</p>
-            <p className="mt-1 text-xs leading-relaxed text-plum/45">
-              Novas atividades e lembretes aparecem aqui.
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 /** Menu de conta — chip (avatar + nome + chevron) que abre um dropdown com as
  *  informações da usuária e a ação de sair. Fecha ao clicar fora ou com Esc. */

@@ -35,7 +35,11 @@ type StatusSessao = components['schemas']['StatusSessao']
  * aqui basta guardar como montar a query.
  */
 const FILTROS: { chave: string; label: string; status?: StatusSessao[]; periodo?: 'proximas' | 'anteriores' }[] = [
-  { chave: 'proximas', label: 'Próximas', status: ['Agendada', 'Confirmada'], periodo: 'proximas' },
+  // `Cancelada` entra em "Próximas" de propósito. Uma sessão cancelada que ainda não
+  // aconteceu é um combinado desfeito, e antes ela sumia daqui direto para "Anteriores" —
+  // ou seja, o app tirava o aviso exatamente do lugar onde a usuária olharia. O e-mail sai,
+  // mas dentro do app não sobrava rastro. Ela sai sozinha desta aba quando a data passa.
+  { chave: 'proximas', label: 'Próximas', status: ['Agendada', 'Confirmada', 'Cancelada'], periodo: 'proximas' },
   { chave: 'anteriores', label: 'Anteriores', status: ['Realizada', 'Cancelada'], periodo: 'anteriores' },
   { chave: 'todas', label: 'Todas' },
 ]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyState } from '@/components/ui'
 import {
@@ -65,15 +65,18 @@ function porDia(slots: Slot[]): { chave: string; slots: Slot[] }[] {
  * em 0 porque não dá pra marcar no passado. O backend já filtrou o que não pode ser
  * marcado, então a tela nunca desabilita um horário: se veio, é selecionável. Escolher um
  * horário leva à confirmação (U5).
+ *
+ * **Abre sempre na semana ATUAL.** Houve aqui um avanço automático até a primeira semana
+ * com horário: com a agenda esparsa parecia útil, mas desorientava — quem entrava em agosto
+ * era levado em silêncio para outubro, sem pedir e sem entender por quê, e o "Anterior"
+ * passava a ser a única pista de que a semana de hoje havia sido pulada. Hoje quem decide
+ * andar é a pessoa; o estado vazio diz o que fazer.
  */
 export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profissionalId: string }) {
   const router = useRouter()
   const voltar = useVoltar(`/agendar/${tipo}`)
   const [semana, setSemana] = useState(0)
   const semanaAtual = semanaISO(semana)
-  // Só busca a 1ª semana com horário sozinho ATÉ a pessoa navegar manualmente — depois
-  // disso, "Anterior"/"Próxima" mandam, mesmo que caiam numa semana vazia.
-  const autoBuscandoRef = useRef(true)
 
   const { dados, carregando, erro, recarregar } = useRecurso(
     () =>
@@ -86,18 +89,7 @@ export function HorariosView({ tipo, profissionalId }: { tipo: TipoSessao; profi
   const dias = porDia(dados?.slots ?? [])
   const vazio = !carregando && !erro && dias.length === 0
 
-  // A cada semana entra com agenda esparsa: em vez de abrir sempre na semana atual (quase
-  // sempre vazia) e deixar a pessoa clicando "próxima" às cegas, avança sozinho até achar
-  // a primeira semana com horário — mesmo comportamento útil que a lista contínua antiga
-  // dava de graça, sem reintroduzir a janela fixa de 30 dias (D24).
-  useEffect(() => {
-    if (autoBuscandoRef.current && vazio && semana < LIMITE_SEMANAS) {
-      setSemana((s) => s + 1)
-    }
-  }, [vazio, semana])
-
   const irParaSemana = (delta: number) => {
-    autoBuscandoRef.current = false
     setSemana((s) => Math.min(LIMITE_SEMANAS, Math.max(0, s + delta)))
   }
 

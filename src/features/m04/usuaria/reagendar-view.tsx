@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmptyState } from '@/components/ui'
 import {
@@ -74,11 +74,11 @@ export function ReagendarView({ sessaoId }: { sessaoId: string }) {
   // Reagendar é sensível (troca a sessão de vez, regenera a sala) — escolher um horário só
   // abre a confirmação; o PATCH real só sai do clique dentro do diálogo (`confirmar`).
   const [slotEscolhido, setSlotEscolhido] = useState<Slot | null>(null)
+  // Abre na semana atual, espelhando a U4 (ver horarios-view.tsx): o avanço automático até
+  // a primeira semana com horário saiu de lá e daqui pelo mesmo motivo — levava a pessoa
+  // para semanas distantes sem ela pedir nem perceber.
   const [semana, setSemana] = useState(0)
   const semanaAtual = semanaISO(semana)
-  // Só busca a 1ª semana com horário sozinho ATÉ a pessoa navegar manualmente — depois
-  // disso, "Anterior"/"Próxima" mandam, mesmo que caiam numa semana vazia.
-  const autoBuscandoRef = useRef(true)
 
   const { dados: sessao, carregando: carregandoSessao, erro: erroSessao, recarregar } = useRecurso<Sessao>(
     () => m04.GET('/sessoes/{sessaoId}', { params: { path: { sessaoId } } }),
@@ -104,17 +104,7 @@ export function ReagendarView({ sessaoId }: { sessaoId: string }) {
   const carregando = carregandoSessao || (!!sessao && carregandoSlots)
   const vazio = !carregando && dias.length === 0
 
-  // Mesmo avanço automático da U4 (ver horarios-view.tsx): sem isso, a tela quase sempre
-  // abre na semana atual vazia, já que a agenda costuma ter os primeiros horários livres
-  // só dali a alguns dias.
-  useEffect(() => {
-    if (autoBuscandoRef.current && vazio && semana < LIMITE_SEMANAS) {
-      setSemana((s) => s + 1)
-    }
-  }, [vazio, semana])
-
   const irParaSemana = (delta: number) => {
-    autoBuscandoRef.current = false
     setSemana((s) => Math.min(LIMITE_SEMANAS, Math.max(0, s + delta)))
   }
 
