@@ -19,10 +19,23 @@ import type { NextConfig } from 'next'
  */
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'https://api.entreser.sw3.tec.br'
 
-// M04 (Agendamento) fala com um backend próprio. Hoje é o mock Prism em :4010 (D20 — o
-// backend ainda não existe); troque `M04_ORIGIN` para o staging quando existir. Proxy
-// same-origin `/m04-api/*` para evitar CORS, espelhando o `/api/*` acima.
-const M04_ORIGIN = process.env.M04_ORIGIN ?? 'http://localhost:4010'
+/**
+ * Proxy same-origin `/m04-api/*` do M04 (Agendamento), espelhando o `/api/*` acima.
+ *
+ * O padrão é o MESMO host do resto da API porque hoje é o mesmo Spring: ele serve
+ * `/api/v1/...` (M01/M05) e as rotas do M04 na raiz. `M04_ORIGIN` continua existindo para
+ * apontar para outro ambiente — em `.env.local` ela manda o dev local para o `dev-api`.
+ *
+ * **O padrão já foi `http://localhost:4010`** (o mock Prism de quando o backend do M04 não
+ * existia), e isso derrubou o módulo inteiro em homologação: sem a variável definida na
+ * hospedagem, a Vercel resolvia `localhost`, via IP privado e recusava o proxy com
+ * `404 DNS_HOSTNAME_RESOLVED_PRIVATE`. O `/api/*` passou ileso pelo mesmo esquecimento
+ * só porque o padrão dele já era público — era a assimetria entre as duas linhas que
+ * transformava "variável esquecida" em 404 silencioso aqui e em nada ali.
+ *
+ * Herdar de `BACKEND_ORIGIN` também impede que os dois destinos divirjam por engano.
+ */
+const M04_ORIGIN = process.env.M04_ORIGIN ?? BACKEND_ORIGIN
 
 const nextConfig: NextConfig = {
   async rewrites() {
