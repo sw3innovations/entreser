@@ -121,31 +121,6 @@ export const HORIZONTE_AGENDAMENTO_DIAS = 90
 export const HORIZONTE_AGENDAMENTO_SEMANAS = Math.floor(HORIZONTE_AGENDAMENTO_DIAS / 7)
 
 /**
- * Segunda a domingo da semana `hoje + offsetSemanas` semanas, em `YYYY-MM-DD` local — base da
- * navegação semana a semana da U4/reagendar (`offsetSemanas: 0` é a semana atual, negativo é
- * passado). Rótulo curto pro cabeçalho: "12–18 de ago" (mesmo mês) ou, na virada de mês,
- * "28 de jul – 3 de ago".
- */
-export function semanaISO(offsetSemanas: number): { inicio: string; fim: string; rotulo: string } {
-  const d = new Date()
-  const diaSemana = d.getDay() // 0 = domingo
-  const offsetSegunda = diaSemana === 0 ? -6 : 1 - diaSemana
-  d.setDate(d.getDate() + offsetSegunda + offsetSemanas * 7)
-  const segunda = new Date(d)
-  const domingo = new Date(d)
-  domingo.setDate(domingo.getDate() + 6)
-
-  const mesSegunda = segunda.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
-  const mesDomingo = domingo.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
-  const rotulo =
-    mesSegunda === mesDomingo
-      ? `${segunda.getDate()}–${domingo.getDate()} de ${mesSegunda}`
-      : `${segunda.getDate()} de ${mesSegunda} – ${domingo.getDate()} de ${mesDomingo}`
-
-  return { inicio: paraISO(segunda), fim: paraISO(domingo), rotulo }
-}
-
-/**
  * Instante UTC do início do mês corrente (dia 1, 00:00 local) — mesma conversão cuidadosa de
  * `inicioDoDiaUTC` (a data local não é a mesma coisa que a data UTC).
  */
@@ -225,4 +200,73 @@ export function quandoAcontece(iso: string): string | null {
   const curto = diasAte(iso)
   if (curto == null) return null
   return curto === 'hoje' || curto === 'amanhã' ? curto : `em ${curto}`
+}
+
+/**
+ * A janela de slots que as telas de escolha de horário pedem — os 90 dias inteiros, de uma
+ * vez só. É exatamente o teto que o contrato permite consultar (`JANELA_MUITO_LONGA` acima
+ * disso), e é o que faz o calendário abrir já no primeiro mês com vaga: com o horizonte
+ * todo em mãos, trocar de mês e de dia é derivação, não requisição.
+ *
+ * `fim` usa `DIAS - 1` porque o intervalo é inclusivo nas duas pontas: de hoje a `hoje+90`
+ * seriam 91 dias, e o backend recusaria.
+ */
+export function janelaDoHorizonte(): { inicio: string; fim: string } {
+  return { inicio: hojeISO(), fim: emDiasISO(HORIZONTE_AGENDAMENTO_DIAS - 1) }
+}
+
+/**
+ * Distância em MESES de calendário entre hoje e uma data local (`YYYY-MM-DD`) — 0 é este
+ * mês, 1 o que vem. Conta viradas de mês, não dias: 31/08 e 01/09 distam 1, apesar de um
+ * dia. É o que traduz "o primeiro slot cai em setembro" para o offset que o calendário usa.
+ */
+export function offsetDeMes(dataLocal: string): number {
+  const hoje = new Date()
+  const ano = Number(dataLocal.slice(0, 4))
+  const mes = Number(dataLocal.slice(5, 7)) - 1
+  return (ano - hoje.getFullYear()) * 12 + (mes - hoje.getMonth())
+}
+
+/** Último mês navegável: o mês em que o horizonte termina (teto do "próximo mês"). */
+export function mesesDoHorizonte(): number {
+  return offsetDeMes(janelaDoHorizonte().fim)
+}
+
+/** Rótulos das colunas do calendário, na ordem em que `mesISO` monta a grade. */
+export const DIAS_DA_SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'] as const
+
+/**
+ * O mês `hoje + offsetMeses` pronto para virar calendário: a janela `inicio`/`fim` que vai
+ * na busca de slots, o rótulo do cabeçalho ("agosto de 2026") e a GRADE já paginada em
+ * semanas de segunda a domingo.
+ *
+ * `dias` vem com `null` nas casas antes do dia 1 — são os buracos da primeira semana, que o
+ * calendário desenha vazios para o dia 1 cair na coluna do seu dia da semana. Cada casa
+ * preenchida é `YYYY-MM-DD` local, a mesma chave de `chaveDoDia`, então dá para cruzar com
+ * os slots sem reconverter fuso no meio do caminho.
+ */
+export function mesISO(offsetMeses: number): {
+  inicio: string
+  fim: string
+  rotulo: string
+  dias: (string | null)[]
+} {
+  const hoje = new Date()
+  const primeiro = new Date(hoje.getFullYear(), hoje.getMonth() + offsetMeses, 1)
+  const ultimo = new Date(primeiro.getFullYear(), primeiro.getMonth() + 1, 0)
+
+  // getDay() é domingo-first (0); a grade é segunda-first, daí o domingo virar a 7ª casa.
+  const diaDaSemana = primeiro.getDay()
+  const buracos = diaDaSemana === 0 ? 6 : diaDaSemana - 1
+  const dias: (string | null)[] = Array.from({ length: buracos }, () => null)
+  for (let d = 1; d <= ultimo.getDate(); d++) {
+    dias.push(paraISO(new Date(primeiro.getFullYear(), primeiro.getMonth(), d)))
+  }
+
+  return {
+    inicio: paraISO(primeiro),
+    fim: paraISO(ultimo),
+    rotulo: primeiro.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+    dias,
+  }
 }
