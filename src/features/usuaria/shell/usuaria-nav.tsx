@@ -38,3 +38,11 @@ export const NAV_FULLSCREEN_PREFIXES = ['/onboarding', '/conteudos/']
  * junto com a BottomNav, e essas telas ficam sem nenhum "chrome" acima no desktop.
  */
 export const BOTTOMNAV_HIDDEN_PREFIXES = ['/onboarding', '/conteudos/', '/agendar', '/sessoes/']
+
+/**
+ * Idem, por SUFIXO — o fechamento de trilha (`/trilhas/[id]/fim`) é a última tela de um
+ * fluxo que já corria sem BottomNav (o leitor); os dois botões dela SÃO a navegação, e a
+ * barra por cima deles quebrava a saída. Por prefixo não dava: `/trilhas/` esconderia a
+ * barra na lista e no detalhe, que a querem.
+ */
+export const BOTTOMNAV_HIDDEN_SUFFIXES = ['/fim']

@@ -372,3 +372,31 @@ input:autofill {
   -webkit-text-fill-color: var(--color-plum) !important;
   caret-color: var(--color-plum) !important;
 }
+
+/* ────────────────────────────────────────────────────────────────
+   5. LEITURA — pausa dentro do texto
+   ────────────────────────────────────────────────────────────────
+   No leitor da Usuária, um `---` do markdown vira um RESPIRO em vez de um
+   filete: a autora marca o lugar de parar, a leitora encontra um convite.
+   É o embrião do nó de Pausa do redesenho das trilhas — sem esperar o
+   modelo novo, a Carol já pode usar hoje em qualquer conteúdo.
+
+   FORA de @layer e com !important porque o `mdToHtml` grava o estilo do
+   <hr> INLINE (ele também serve o preview do backoffice); só assim a regra
+   vence. Escopo `.leitura` para não vazar para outros <hr> do app.         */
+.leitura hr {
+  border: none !important;
+  border-top: 1px solid rgb(45 24 64 / 0.12) !important;
+  margin: 48px 0 !important;
+  padding: 22px 0 12px;
+  overflow: visible;
+  text-align: center;
+  color: rgb(122 74 92 / 0.9); /* mauve */
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-style: italic;
+  line-height: 1.3;
+}
+.leitura hr::before {
+  content: 'Respire um pouco. Quando quiser, siga.';
+}

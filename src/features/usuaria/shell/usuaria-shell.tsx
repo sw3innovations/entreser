@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { BottomNav } from '../ui'
 import { UsuariaHeader } from './usuaria-header'
-import { USUARIA_NAV_MOBILE, NAV_FULLSCREEN_PREFIXES, BOTTOMNAV_HIDDEN_PREFIXES } from './usuaria-nav'
+import { USUARIA_NAV_MOBILE, NAV_FULLSCREEN_PREFIXES, BOTTOMNAV_HIDDEN_PREFIXES, BOTTOMNAV_HIDDEN_SUFFIXES } from './usuaria-nav'
 
 /**
  * UsuariaShell — casca responsiva do app autenticado da Usuária (M05).
@@ -21,7 +21,9 @@ import { USUARIA_NAV_MOBILE, NAV_FULLSCREEN_PREFIXES, BOTTOMNAV_HIDDEN_PREFIXES 
 export function UsuariaShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const hideHeader = NAV_FULLSCREEN_PREFIXES.some((p) => pathname.startsWith(p))
-  const hideBottomNav = BOTTOMNAV_HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))
+  const hideBottomNav =
+    BOTTOMNAV_HIDDEN_PREFIXES.some((p) => pathname.startsWith(p)) ||
+    BOTTOMNAV_HIDDEN_SUFFIXES.some((s) => pathname.endsWith(s))
 
   return (
     <div className={cn('min-h-dvh bg-canvas', !hideBottomNav && 'pb-24 lg:pb-0')}>

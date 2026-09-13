@@ -5,17 +5,26 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ESButton, EmptyState, CheckIcon } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { PageHero, PageContent, HeroIconButton, HeroProgress, ArrowLeftIcon, ChevronRightIcon } from '../ui'
+import { PageHero, PageContent, HeroIconButton, ArrowLeftIcon, ChevronRightIcon } from '../ui'
 import { conteudoHref, FORMATO_LABEL } from '../lib/content'
 import { useVoltar } from '@/features/usuaria/shell/nav-history'
 import { useTrilha } from './use-trilhas'
 import type { TrilhaItem } from './types'
 
 /**
- * TrilhaDetailView (UF5) — jornada ordenada de conteúdos (handoff 05). Herói
- * imersivo com progresso (barra creme) + CTA "Continuar →", e uma LINHA DO TEMPO:
- * nós de estado à esquerda (concluído ✓ · atual ● · a seguir nº) ligados por um
- * conector vertical, cada passo num card (tile 72px, formato, título serifado).
+ * TrilhaDetailView (UF5) — a entrada de um percurso. Herói com o que a trilha É (descrição,
+ * tamanho em tempo) e ONDE a pessoa está ("Você está em: …"), mais o CTA "Continuar →"; e
+ * uma LINHA DO TEMPO: nós de estado à esquerda (concluído ✓ · atual ● · a seguir nº)
+ * ligados por um conector vertical, cada passo num card (tile 72px, formato, título).
+ *
+ * Aqui já houve uma barra de progresso com "%" e "N de M conteúdos". Saiu: uma trilha não
+ * é tarefa a cumprir, e "60% concluído" transforma atravessar um tratamento em produtividade
+ * — é a primeira regra do produto. O que a pessoa precisa saber é onde está e o que vem
+ * a seguir, e é só isso que o herói diz agora. (O nº dos passos fica: é ORDEM, não meta.)
+ *
+ * Os links dos passos levam o `trilha.id` para o leitor entrar em modo trilha (ver
+ * `conteudoHref` e `ConteudoReaderView`) — sem isso cada passo abria o leitor avulso, e a
+ * trilha era só um sumário.
  */
 export function TrilhaDetailView({ id }: { id: string }) {
   const router = useRouter()
@@ -60,19 +69,39 @@ export function TrilhaDetailView({ id }: { id: string }) {
   }
 
   const proximo = trilha.itens.find((i) => !i.consumido)
+  const comecou = trilha.consumidos > 0
+  const terminou = trilha.itens.length > 0 && !proximo
   const cta = proximo ?? trilha.itens[0]
-  const ctaLabel = trilha.consumidos === 0 ? 'Começar trilha' : proximo ? 'Continuar' : 'Revisar trilha'
-  const label = `${trilha.consumidos} de ${trilha.total} ${trilha.total === 1 ? 'conteúdo' : 'conteúdos'}`
+  const ctaLabel = !comecou ? 'Começar trilha' : proximo ? 'Continuar' : 'Rever a trilha'
+  // "Cerca de N min": soma do que tem duração informada. Só aparece quando há algo a somar.
+  const minutos = trilha.itens.reduce((acc, i) => acc + (i.duracao ?? 0), 0)
 
   return (
     <div className="min-h-dvh">
       <PageHero width="md" topBar={backBar} eyebrow="Trilha" title={trilha.titulo} description={trilha.descricao || undefined}>
         <div className="mt-5 max-w-md">
-          <HeroProgress value={trilha.progresso} label={label} />
+          {terminou ? (
+            <p className="text-[14px] leading-relaxed text-cream/70">
+              Você chegou ao fim desta trilha.{' '}
+              <Link href={`/trilhas/${trilha.id}/fim`} className="font-semibold text-cream underline underline-offset-4">
+                Ver o que você guardou
+              </Link>
+            </p>
+          ) : comecou && proximo ? (
+            <>
+              <p className="text-eyebrow text-cream/55">Você está em</p>
+              <p className="mt-1 font-display text-[19px] leading-snug text-cream">{proximo.titulo}</p>
+            </>
+          ) : (
+            <p className="text-[14px] text-cream/70">
+              {trilha.itens.length} {trilha.itens.length === 1 ? 'passo' : 'passos'}
+              {minutos > 0 && ` · cerca de ${minutos} min`}
+            </p>
+          )}
         </div>
         {cta && (
           <Link
-            href={conteudoHref(cta.conteudoId)}
+            href={conteudoHref(cta.conteudoId, trilha.id)}
             className="mt-[22px] inline-flex items-center gap-2.5 rounded-full bg-cream px-[22px] py-[14px] text-[15px] font-semibold text-plum shadow-[0_8px_22px_rgba(0,0,0,0.28)] transition-es hover:bg-cream-mid active:scale-[0.99]"
           >
             {ctaLabel}
@@ -82,7 +111,7 @@ export function TrilhaDetailView({ id }: { id: string }) {
       </PageHero>
 
       <PageContent width="md" className="pb-10 pt-6">
-        <p className="text-eyebrow mb-4 px-0.5 text-mauve">Conteúdos da trilha</p>
+        <p className="text-eyebrow mb-4 px-0.5 text-mauve">O caminho</p>
 
         {trilha.itens.length === 0 ? (
           <EmptyState title="Trilha sem conteúdos" description="Esta trilha ainda não tem conteúdos publicados." />
@@ -102,7 +131,7 @@ export function TrilhaDetailView({ id }: { id: string }) {
                   {/* Passo */}
                   <div className="min-w-0 flex-1 pb-5">
                     {current && <p className="text-eyebrow mb-[10px] mt-2 text-mauve">Continue por aqui</p>}
-                    <StepCard item={item} current={current} />
+                    <StepCard item={item} current={current} trilhaId={trilha.id} />
                   </div>
                 </li>
               )
@@ -139,9 +168,9 @@ function StepMarker({ ordem, consumido, current }: { ordem: number; consumido: b
 
 /** Card de um passo: capa 72px, formato (eyebrow), título serifado, e "Concluído"
  *  (verde) OU chevron. O passo atual ganha sombra/borda de destaque. */
-function StepCard({ item, current }: { item: TrilhaItem; current: boolean }) {
+function StepCard({ item, current, trilhaId }: { item: TrilhaItem; current: boolean; trilhaId: string }) {
   return (
-    <Link href={conteudoHref(item.conteudoId)} className="block">
+    <Link href={conteudoHref(item.conteudoId, trilhaId)} className="block">
       <div
         className={cn(
           'flex items-center gap-[13px] rounded-[18px] bg-white p-3 transition-es hover:shadow-card-hover active:scale-[0.99]',
