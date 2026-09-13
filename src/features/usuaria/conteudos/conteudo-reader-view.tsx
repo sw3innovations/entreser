@@ -44,7 +44,9 @@ function BookmarkIcon({ size = 19 }: { size?: number }) {
  */
 const PROSE = cn(
   'leitura',
-  '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+  // Com `!` porque as margens dos títulos abaixo também têm `!` — sem isso, um h2 no topo
+  // do artigo abria 36px a mais entre o hero e a primeira linha.
+  '[&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0',
   '[&_h2]:!mb-3 [&_h2]:!mt-9 [&_h2]:font-display [&_h2]:!text-[24px] [&_h2]:font-medium [&_h2]:leading-[1.2] [&_h2]:text-plum',
   '[&_h3]:!mb-3 [&_h3]:!mt-8 [&_h3]:font-display [&_h3]:!text-[20px] [&_h3]:font-medium [&_h3]:leading-[1.25] [&_h3]:text-plum',
   '[&_p]:!mb-6 [&_p]:!text-[17px] [&_p]:!leading-[1.8] [&_p]:!text-plum',
