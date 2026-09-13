@@ -17,9 +17,15 @@ export function formatDuracao(formato: Formato, minutos: number | null | undefin
   return formato === 'artigo' ? `${minutos} min de leitura` : `${minutos} min`
 }
 
-/** Rota do leitor de um conteúdo. Ponto único — evita `/conteudos/${id}` espalhado. */
-export function conteudoHref(id: string): string {
-  return `/conteudos/${id}`
+/**
+ * Rota do leitor de um conteúdo. Ponto único — evita `/conteudos/${id}` espalhado.
+ *
+ * `trilhaId` liga o leitor ao percurso: com ele, o leitor sabe de que trilha o conteúdo
+ * veio, mostra o próximo passo e devolve para a trilha ao voltar. Sem ele (feed, busca,
+ * recentes) o mesmo leitor se comporta como leitura avulsa.
+ */
+export function conteudoHref(id: string, trilhaId?: string): string {
+  return trilhaId ? `/conteudos/${id}?trilha=${encodeURIComponent(trilhaId)}` : `/conteudos/${id}`
 }
 
 /**

@@ -52,21 +52,35 @@ export function useConteudo(id: string) {
     }
   }, [id, nonce])
 
-  const toggleConcluido = useCallback(async () => {
-    if (!conteudo || salvando) return
-    const novo = !conteudo.consumido
-    setConteudo({ ...conteudo, consumido: novo }) // otimista
-    setSalvando(true)
-    try {
-      await conteudosUsuariaService.setProgresso(conteudo.id, novo)
-      showToast(novo ? 'Marcado como concluído.' : 'Marcação desfeita.', 'success')
-    } catch {
-      setConteudo((c) => (c ? { ...c, consumido: !novo } : c)) // rollback
-      showToast('Não foi possível salvar. Tente novamente.', 'error')
-    } finally {
-      setSalvando(false)
-    }
-  }, [conteudo, salvando, showToast])
+  /**
+   * Marca (ou desmarca) e diz se deu certo. O valor é explícito porque o modo trilha
+   * precisa de "concluir E seguir": ele marca como concluído e só navega se salvou — um
+   * toggle cego poderia DESmarcar um passo já feito e ainda assim levar ao próximo.
+   */
+  const marcarConcluido = useCallback(
+    async (novo: boolean): Promise<boolean> => {
+      if (!conteudo || salvando) return false
+      if (conteudo.consumido === novo) return true
+      setConteudo({ ...conteudo, consumido: novo }) // otimista
+      setSalvando(true)
+      try {
+        await conteudosUsuariaService.setProgresso(conteudo.id, novo)
+        showToast(novo ? 'Marcado como concluído.' : 'Marcação desfeita.', 'success')
+        return true
+      } catch {
+        setConteudo((c) => (c ? { ...c, consumido: !novo } : c)) // rollback
+        showToast('Não foi possível salvar. Tente novamente.', 'error')
+        return false
+      } finally {
+        setSalvando(false)
+      }
+    },
+    [conteudo, salvando, showToast],
+  )
 
-  return { conteudo, loading, error, notFound, salvando, toggleConcluido, reload }
+  const toggleConcluido = useCallback(() => {
+    if (conteudo) void marcarConcluido(!conteudo.consumido)
+  }, [conteudo, marcarConcluido])
+
+  return { conteudo, loading, error, notFound, salvando, toggleConcluido, marcarConcluido, reload }
 }
