@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ESSkeleton, TrilhasIcon } from '@/components/ui'
+import { ESSkeleton } from '@/components/ui'
 import { useAuth } from '@/features/auth/context/auth-context'
 import { useHydrated } from '@/lib/use-hydrated'
 import { useProximaSessao } from '@/features/m04/usuaria/use-proxima-sessao'
@@ -15,8 +15,6 @@ import {
   Capa,
   CartazConteudo,
   NotificacoesMenu,
-  CompassIcon,
-  CalendarIcon,
   ChevronRightIcon,
   InfoIcon,
 } from '../ui'
@@ -103,11 +101,14 @@ export function HomeView() {
       </header>
 
       {/* Atalhos */}
-      <nav aria-label="Atalhos" className="mt-[22px] grid grid-cols-4 gap-1.5 sm:max-w-md">
-        <Atalho href="/jornada" rotulo="Jornada" icone={<TrilhasIcon size={23} />} />
-        <Atalho href="/explorar" rotulo="Explorar" icone={<CompassIcon size={23} />} />
-        <Atalho href="/consultas" rotulo="Consultas" icone={<CalendarIcon size={23} />} />
-        <Atalho onClick={() => setSheetAberto(true)} rotulo="Humor" icone={<TermometroGlyph />} />
+      {/* `justify-between`, não grade: na grade cada botão ficava CENTRADO na sua coluna, então
+          o primeiro não encostava na margem do título e os vãos pareciam soltos. Assim as pontas
+          alinham com a coluna e o espaço se divide entre os botões. */}
+      <nav aria-label="Atalhos" className="mt-[22px] flex justify-between lg:justify-start lg:gap-8">
+        <Atalho href="/jornada" rotulo="Jornada" icone={<GlifoAtalho tipo="jornada" />} />
+        <Atalho href="/explorar" rotulo="Explorar" icone={<GlifoAtalho tipo="explorar" />} />
+        <Atalho href="/consultas" rotulo="Consultas" icone={<GlifoAtalho tipo="consultas" />} />
+        <Atalho onClick={() => setSheetAberto(true)} rotulo="Humor" icone={<GlifoAtalho tipo="humor" />} />
       </nav>
 
       {/* Check-in reduzido */}
@@ -204,10 +205,13 @@ function Atalho({
       <span className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-white text-mauve shadow-[0_4px_16px_rgba(45,24,64,0.08)] transition-es group-hover:shadow-[0_6px_20px_rgba(45,24,64,0.14)]">
         {icone}
       </span>
-      <span className="text-[11.5px] font-semibold text-plum">{rotulo}</span>
+      <span className="whitespace-nowrap text-[11.5px] font-semibold text-plum">{rotulo}</span>
     </>
   )
-  const cls = 'group flex flex-col items-center gap-[7px]'
+  // Largura fixa = a do quadrado: com `justify-between`, itens de larguras diferentes (o rótulo
+  // "Consultas" é mais largo) deixariam os vãos desiguais. O rótulo pode passar um pouco das
+  // bordas do quadrado, centrado.
+  const cls = 'group flex w-14 flex-col items-center gap-[7px]'
   return href ? (
     <Link href={href} className={cls}>
       {conteudo}
@@ -219,10 +223,34 @@ function Atalho({
   )
 }
 
-function TermometroGlyph() {
+/**
+ * Os quatro ícones dos atalhos, desenhados JUNTOS: mesmo tamanho (23), mesmo traço (1.4, o do
+ * protótipo) e mesma caixa. Antes vinham de três kits diferentes — traço 1.9 na Jornada, 1.6
+ * em Explorar/Consultas, 1.5 no termômetro — e o primeiro parecia em negrito ao lado dos outros.
+ */
+function GlifoAtalho({ tipo }: { tipo: 'jornada' | 'explorar' | 'consultas' | 'humor' }) {
   return (
-    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {tipo === 'jornada' && (
+        <>
+          <circle cx="6" cy="19" r="2" />
+          <path d="M9 19h6.5a3.5 3.5 0 0 0 0-7h-6a3.5 3.5 0 0 1 0-7H15" />
+          <circle cx="18" cy="5" r="2" />
+        </>
+      )}
+      {tipo === 'explorar' && (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="m15.5 8.5-2.1 4.9-4.9 2.1 2.1-4.9z" />
+        </>
+      )}
+      {tipo === 'consultas' && (
+        <>
+          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+          <path d="M16 3v4M8 3v4M3.5 10h17" />
+        </>
+      )}
+      {tipo === 'humor' && <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />}
     </svg>
   )
 }
