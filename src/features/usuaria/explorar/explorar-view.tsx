@@ -185,7 +185,7 @@ function Destaques({ itens, carregando }: { itens: ContentItemVM[]; carregando: 
           const largura = el.firstElementChild?.getBoundingClientRect().width ?? el.clientWidth
           setAtual(Math.round(el.scrollLeft / (largura + 12)))
         }}
-        className="-mx-[22px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0"
+        className="-mx-[22px] flex snap-x snap-mandatory scroll-px-[22px] gap-3 overflow-x-auto px-[22px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0"
       >
         {itens.map((item, i) => (
           <Link key={item.id} href={item.href} className="group block w-[86%] shrink-0 snap-start lg:w-auto">

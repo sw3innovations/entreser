@@ -55,7 +55,7 @@ export function Carrossel({
   return (
     <div
       className={cn(
-        '-mx-[22px] flex snap-x snap-mandatory gap-3 overflow-x-auto px-[22px] pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        '-mx-[22px] flex snap-x snap-mandatory scroll-px-[22px] gap-3 overflow-x-auto px-[22px] pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         'lg:mx-0 lg:grid lg:overflow-visible lg:px-0',
         grade,
         className,
