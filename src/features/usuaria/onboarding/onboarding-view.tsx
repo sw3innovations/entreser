@@ -56,7 +56,7 @@ export function OnboardingView() {
               quando quiser em “Minha fase”.
             </p>
             <div className="mt-6">
-              <ESButton fullWidth onPress={() => router.replace('/feed')}>
+              <ESButton fullWidth onPress={() => router.replace('/explorar')}>
                 Ir para o feed
               </ESButton>
             </div>
@@ -77,7 +77,7 @@ export function OnboardingView() {
               Tudo pronto para começar. Você pode definir sua fase a qualquer momento em “Minha fase”.
             </p>
             <div className="mt-5">
-              <ESButton fullWidth onPress={() => router.replace('/feed')}>
+              <ESButton fullWidth onPress={() => router.replace('/explorar')}>
                 Ir para o feed
               </ESButton>
             </div>

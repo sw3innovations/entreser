@@ -1,17 +1,21 @@
-import { HomeIcon, ConteudosIcon, TrilhasIcon, FasesIcon, PerfilIcon } from '@/components/ui'
+import { HomeIcon, TrilhasIcon, PerfilIcon } from '@/components/ui'
+import { CompassIcon, CalendarIcon } from '../ui/icons'
 import type { BottomNavItem } from '../ui'
 
 /**
- * Áreas de CONTEÚDO do app da Usuária (Início, Feed, Trilhas, Minha fase). É a
- * lista usada pela navegação central do header (desktop) — onde a conta já vive
- * no menu à direita, então "Conta" NÃO entra aqui. Abas de outros módulos
- * (Social, Agendar, Diário) entram quando forem construídas, sem tocar no shell.
+ * Áreas principais do app da Usuária depois do redesenho: Início · Explorar · Jornada ·
+ * Consultas. É a lista usada pela navegação central do header (desktop) — onde a conta já
+ * vive no menu à direita, então "Conta" NÃO entra aqui.
+ *
+ * `alias` são as rotas que pertencem à área sem morar sob o `href` dela: a trilha e o leitor
+ * de conteúdo são o Explorar; agendar e o detalhe da sessão são Consultas; "Minha fase"
+ * virou parte da Jornada. Sem isso, abrir uma trilha deixava a barra sem nenhuma aba acesa.
  */
 export const USUARIA_NAV: BottomNavItem[] = [
   { key: 'home', label: 'Início', href: '/home', icon: <HomeIcon /> },
-  { key: 'feed', label: 'Feed', href: '/feed', icon: <ConteudosIcon /> },
-  { key: 'trilhas', label: 'Trilhas', href: '/trilhas', icon: <TrilhasIcon /> },
-  { key: 'fase', label: 'Minha fase', href: '/fase', icon: <FasesIcon /> },
+  { key: 'explorar', label: 'Explorar', href: '/explorar', icon: <CompassIcon />, alias: ['/feed', '/trilhas', '/conteudos'] },
+  { key: 'jornada', label: 'Jornada', href: '/jornada', icon: <TrilhasIcon />, alias: ['/fase'] },
+  { key: 'consultas', label: 'Consultas', href: '/consultas', icon: <CalendarIcon />, alias: ['/sessoes', '/agendar'] },
 ]
 
 /**

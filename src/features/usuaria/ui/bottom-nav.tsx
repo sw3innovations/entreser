@@ -10,6 +10,8 @@ export interface BottomNavItem {
   label: string
   href: string
   icon: ReactNode
+  /** Outras rotas que acendem esta aba (ver `USUARIA_NAV`). */
+  alias?: string[]
 }
 
 interface BottomNavProps {
@@ -25,9 +27,11 @@ interface BottomNavProps {
 export function getActiveKey(items: BottomNavItem[], pathname: string): string | null {
   let best: { key: string; len: number } | null = null
   for (const item of items) {
-    const matches = pathname === item.href || pathname.startsWith(`${item.href}/`)
-    if (matches && (!best || item.href.length > best.len)) {
-      best = { key: item.key, len: item.href.length }
+    for (const href of [item.href, ...(item.alias ?? [])]) {
+      const matches = pathname === href || pathname.startsWith(`${href}/`)
+      if (matches && (!best || href.length > best.len)) {
+        best = { key: item.key, len: href.length }
+      }
     }
   }
   return best?.key ?? null

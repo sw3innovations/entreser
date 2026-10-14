@@ -1,6 +1,6 @@
-import { FeedView } from '@/features/usuaria/feed/feed-view'
+import { redirect } from 'next/navigation'
 
-/** Feed personalizado + Trilhas + Explorar (UF2/UF3/UF4/UF5). */
+/** O Feed virou o Explorar (redesenho). Links antigos e favoritos continuam funcionando. */
 export default function FeedPage() {
-  return <FeedView />
+  redirect('/explorar')
 }

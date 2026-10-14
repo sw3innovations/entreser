@@ -81,7 +81,7 @@ export function ConteudoReaderView({ id, trilhaId }: { id: string; trilhaId: str
 
   // Volta para onde ela veio quando há histórico in-app; senão, para a trilha (modo
   // trilha) ou para o feed. Ver `useVoltar`/`NavHistoryProvider`.
-  const voltar = useVoltar(trilhaId ? `/trilhas/${trilhaId}` : '/feed')
+  const voltar = useVoltar(trilhaId ? `/trilhas/${trilhaId}` : '/explorar')
 
   const backBar = (
     <HeroIconButton aria-label="Voltar" onPress={voltar}>
@@ -98,8 +98,8 @@ export function ConteudoReaderView({ id, trilhaId }: { id: string; trilhaId: str
         title="Conteúdo indisponível"
         description="Este conteúdo não está mais disponível ou foi despublicado."
         action={
-          <ESButton variant="secondary" onPress={() => router.push(trilhaId ? `/trilhas/${trilhaId}` : '/feed')}>
-            {trilhaId ? 'Voltar à trilha' : 'Voltar ao feed'}
+          <ESButton variant="secondary" onPress={() => router.push(trilhaId ? `/trilhas/${trilhaId}` : '/explorar')}>
+            {trilhaId ? 'Voltar à trilha' : 'Voltar ao Explorar'}
           </ESButton>
         }
       />
