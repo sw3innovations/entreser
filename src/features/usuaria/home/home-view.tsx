@@ -101,10 +101,13 @@ export function HomeView() {
       </header>
 
       {/* Atalhos */}
-      {/* `justify-between`, não grade: na grade cada botão ficava CENTRADO na sua coluna, então
-          o primeiro não encostava na margem do título e os vãos pareciam soltos. Assim as pontas
-          alinham com a coluna e o espaço se divide entre os botões. */}
-      <nav aria-label="Atalhos" className="mt-[22px] flex justify-between lg:justify-start lg:gap-8">
+      {/* Atalhos como cards pequenos numa fileira que rola, alinhada à esquerda e sangrando
+          até a borda — a mesma linguagem dos carrosséis da tela. Cabe mais atalho no futuro
+          sem apertar os que existem. `scroll-px` para o encaixe respeitar a margem. */}
+      <nav
+        aria-label="Atalhos"
+        className="-mx-[22px] mt-[22px] flex snap-x snap-mandatory scroll-px-[22px] gap-2.5 overflow-x-auto px-[22px] pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:px-0"
+      >
         <Atalho href="/jornada" rotulo="Jornada" icone={<GlifoAtalho tipo="jornada" />} />
         <Atalho href="/explorar" rotulo="Explorar" icone={<GlifoAtalho tipo="explorar" />} />
         <Atalho href="/consultas" rotulo="Consultas" icone={<GlifoAtalho tipo="consultas" />} />
@@ -188,7 +191,10 @@ export function HomeView() {
   )
 }
 
-/** Atalho do topo: quadrado branco 56px com ícone mauve e rótulo. Link ou botão. */
+/**
+ * Atalho do topo: card pequeno (104×92) com o ícone num círculo e o rótulo embaixo, ambos
+ * alinhados à esquerda. Link ou botão (Humor abre o check-in).
+ */
 function Atalho({
   href,
   onClick,
@@ -202,16 +208,12 @@ function Atalho({
 }) {
   const conteudo = (
     <>
-      <span className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-white text-mauve shadow-[0_4px_16px_rgba(45,24,64,0.08)] transition-es group-hover:shadow-[0_6px_20px_rgba(45,24,64,0.14)]">
-        {icone}
-      </span>
-      <span className="whitespace-nowrap text-[11.5px] font-semibold text-plum">{rotulo}</span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-mauve-ghost text-mauve">{icone}</span>
+      <span className="text-[13px] font-semibold text-plum">{rotulo}</span>
     </>
   )
-  // Largura fixa = a do quadrado: com `justify-between`, itens de larguras diferentes (o rótulo
-  // "Consultas" é mais largo) deixariam os vãos desiguais. O rótulo pode passar um pouco das
-  // bordas do quadrado, centrado.
-  const cls = 'group flex w-14 flex-col items-center gap-[7px]'
+  const cls =
+    'flex h-[92px] w-[104px] shrink-0 snap-start flex-col items-start justify-between rounded-[20px] bg-white p-3 text-left shadow-[0_4px_16px_rgba(45,24,64,0.07)] transition-es hover:shadow-[0_6px_20px_rgba(45,24,64,0.13)] active:scale-[0.98]'
   return href ? (
     <Link href={href} className={cls}>
       {conteudo}
@@ -224,13 +226,12 @@ function Atalho({
 }
 
 /**
- * Os quatro ícones dos atalhos, desenhados JUNTOS: mesmo tamanho (23), mesmo traço (1.4, o do
- * protótipo) e mesma caixa. Antes vinham de três kits diferentes — traço 1.9 na Jornada, 1.6
+ * Os quatro ícones dos atalhos, desenhados JUNTOS: mesmo tamanho e mesmo traço, na mesma caixa. Antes vinham de três kits diferentes — traço 1.9 na Jornada, 1.6
  * em Explorar/Consultas, 1.5 no termômetro — e o primeiro parecia em negrito ao lado dos outros.
  */
 function GlifoAtalho({ tipo }: { tipo: 'jornada' | 'explorar' | 'consultas' | 'humor' }) {
   return (
-    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       {tipo === 'jornada' && (
         <>
           <circle cx="6" cy="19" r="2" />
