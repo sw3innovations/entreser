@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { cormorant, onest } from '@/lib/fonts'
+import { ottomat, onest } from '@/lib/fonts'
 import { AuthProvider } from '@/features/auth/context/auth-context'
 import './globals.css'
 
@@ -13,7 +13,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body className={`${cormorant.variable} ${onest.variable} antialiased`}>
+      <body className={`${ottomat.variable} ${onest.variable} antialiased`}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

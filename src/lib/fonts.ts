@@ -1,22 +1,28 @@
-import { Cormorant_Garamond, Onest } from 'next/font/google'
+import localFont from 'next/font/local'
+import { Onest } from 'next/font/google'
 
-/**
- * Cormorant Garamond — tipografia editorial (display/headings).
- * Apenas os pesos/estilos usados (300/400/500 + itálico) para acelerar o build.
- * Exposta via a CSS var `--font-display`.
- */
-export const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['300', '400', '500'],
-  style: ['normal', 'italic'],
+export const ottomat = localFont({
+  src: [
+    {
+      path: '../assets/fonts/Ottomat_OT_Book.otf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../assets/fonts/Ottomat_OT_Italic.otf',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: '../assets/fonts/Ottomat_OT_Bold.otf',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
   variable: '--font-display',
   display: 'swap',
 })
 
-/**
- * Onest — fonte de corpo (body) do projeto.
- * Exposta via a CSS var `--font-onest`.
- */
 export const onest = Onest({
   subsets: ['latin'],
   variable: '--font-onest',
